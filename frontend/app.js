@@ -171,12 +171,12 @@ async function drawCharts(){
     ? v.actual.map((a,i)=>({x:a,y:v.predicted[i], actual:a, predicted:v.predicted[i], error:v.errors[i], index:i, severity:severity(v.errors[i], maxAbsError)})).slice(0,400)
     : v.actual.map((a,i)=>{ const ok = v.is_correct?.[i] ?? Number(a) === Number(v.predicted[i]); return {x:ok ? 'درست' : 'غلط', y:ok ? 1 : 0, actual:v.actual_class?.[i] ?? a, predicted:v.predicted_class?.[i] ?? v.predicted[i], error:v.errors[i], index:i, is_correct:ok, severity:ok ? 'low' : 'high'}; }).slice(0,400);
   const bins = isRegression() ? histogram(v.errors, 20, formatMoney) : classificationSummary(v);
-  vizState = {raw:v, points, bins, maxAbsError, selectedPoint:null, selectedBin:null, selectedFeature:null};
+  vizState = {raw:v, points, bins, maxAbsError, selectedPoint:null, selectedBin:null, selectedFeature:null, selectedConfusionCell:null};
   $('taskLesson').textContent = isRegression() ? 'رگرسیون یعنی فاصله عدد پیش‌بینی‌شده با مقدار واقعی را می‌آموزیم.' : 'طبقه‌بندی یعنی درستی کلاس و احتمال انتخاب‌شده را بررسی می‌کنیم.';
-  $('scatterTitle').textContent = isRegression() ? 'قیمت واقعی در برابر قیمت پیش‌بینی‌شده' : 'خلاصه درست/غلط طبقه‌بندی';
+  $('scatterTitle').textContent = isRegression() ? 'قیمت واقعی در برابر قیمت پیش‌بینی‌شده' : 'ماتریس خطای طبقه‌بندی (Confusion Matrix)';
   $('errorTitle').textContent = isRegression() ? 'توزیع خطای پیش‌بینی (Prediction Error Distribution)' : 'تعداد پیش‌بینی‌های درست و غلط';
   $('errorHelp').textContent = isRegression() ? v.error_definition ? `تعریف خطا: ${v.error_definition}؛ واحد: ${v.error_unit || 'نامشخص'}.` : 'عدد منفی یعنی کم‌برآورد؛ عدد مثبت یعنی بیش‌برآورد.' : 'این نمودار به جای خطای عددی، تعداد پاسخ‌های درست و غلط طبقه‌بندی را نشان می‌دهد.';
-  $('scatterHelp').textContent = isRegression() ? v.ideal_line_description || 'هر نقطه یک خانه است. هرچه به خط ایده‌آل نزدیک‌تر باشد، پیش‌بینی دقیق‌تر است.' : 'هر ستون نشان می‌دهد چند خانه در طبقه‌بندی درست یا غلط پیش‌بینی شده‌اند.';
+  $('scatterHelp').textContent = isRegression() ? v.ideal_line_description || 'هر نقطه یک خانه است. هرچه به خط ایده‌آل نزدیک‌تر باشد، پیش‌بینی دقیق‌تر است.' : 'خانه‌های روی قطر اصلی پیش‌بینی درست هستند؛ خانه‌های بیرون قطر نشان می‌دهند مدل کدام کلاس‌ها را با هم اشتباه گرفته است.';
   resetPanels();
   drawScatter(); drawErrors(); drawImportance();
 }
@@ -190,8 +190,17 @@ function scatterBounds(points){
 function referenceLine(bounds){ return [{x:bounds.min, y:bounds.min}, {x:bounds.max, y:bounds.max}]; }
 
 function drawScatter(){
-  if(!isRegression()) return drawClassificationSummary();
-  const ctx = $('scatter');
+  const scatter = $('scatter');
+  const matrix = $('confusionMatrix');
+  if(!isRegression()){
+    scatter.hidden = true;
+    matrix.hidden = false;
+    return drawConfusionMatrix();
+  }
+  scatter.hidden = false;
+  matrix.hidden = true;
+  matrix.innerHTML = '';
+  const ctx = scatter;
   const bounds = scatterBounds(vizState.points);
   charts.scatter = new Chart(ctx, {
     type:'scatter',
@@ -210,13 +219,57 @@ function drawScatter(){
     }
   });
 }
-function drawClassificationSummary(){
-  const counts = [vizState.points.filter(classOutcome).length, vizState.points.filter(p=>!classOutcome(p)).length];
-  charts.scatter = new Chart($('scatter'), {
-    type:'bar',
-    data:{labels:['درست','غلط'], datasets:[{label:'نتیجه طبقه‌بندی', data:counts, backgroundColor:['#22c55e','#ef4444']}]},
-    options:{maintainAspectRatio:false, animation:false, plugins:{tooltip:{callbacks:{label:c=>`${formatNumber(c.raw)} خانه ${c.label} پیش‌بینی شده است`}}}, onClick:(evt)=>{ const hit=charts.scatter.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectBin(hit.index, false); }, scales:{x:{title:{display:true,text:'نتیجه پیش‌بینی'}}, y:{beginAtZero:true,title:{display:true,text:'تعداد خانه‌ها'}}}}
+function buildConfusionMatrix(){
+  const cm = vizState.raw.confusion_matrix || {};
+  const rawLabels = cm.labels || vizState.raw.class_labels || Array.from(new Set([...(vizState.raw.actual_class || vizState.raw.actual || []), ...(vizState.raw.predicted_class || vizState.raw.predicted || [])]));
+  const labels = rawLabels.map(String);
+  const displayLabels = (cm.display_labels || rawLabels).map(String);
+  const matrix = cm.matrix ? cm.matrix.map(row=>row.map(Number)) : labels.map(()=>labels.map(()=>0));
+  const members = labels.map(()=>labels.map(()=>[]));
+  const actual = vizState.raw.actual_class || vizState.raw.actual || [];
+  const predicted = vizState.raw.predicted_class || vizState.raw.predicted || [];
+  const labelIndex = new Map(labels.map((label, i)=>[String(label), i]));
+  actual.forEach((a, i)=>{
+    const r = labelIndex.get(String(a));
+    const c = labelIndex.get(String(predicted[i]));
+    if(r !== undefined && c !== undefined){
+      members[r][c].push(i);
+      if(!cm.matrix) matrix[r][c]++;
+    }
   });
+  return {labels, displayLabels, matrix, members};
+}
+function drawConfusionMatrix(){
+  const target = $('confusionMatrix');
+  const data = buildConfusionMatrix();
+  vizState.confusion = data;
+  const maxCount = Math.max(...data.matrix.flat(), 1);
+  const cols = data.labels.length + 1;
+  const cells = [];
+  cells.push('<div class="cm-corner"><span>واقعی ↓</span><b>پیش‌بینی →</b></div>');
+  data.displayLabels.forEach(label=>cells.push(`<div class="cm-axis cm-predicted">${escapeHtml(label)}</div>`));
+  data.matrix.forEach((row, r)=>{
+    const rowTotal = row.reduce((sum, n)=>sum + Number(n), 0);
+    cells.push(`<div class="cm-axis cm-actual">${escapeHtml(data.displayLabels[r])}</div>`);
+    row.forEach((count, c)=>{
+      const pct = rowTotal ? count / rowTotal : 0;
+      const intensity = Math.max(0.08, count / maxCount);
+      const correct = r === c;
+      const selected = vizState.selectedConfusionCell?.row === r && vizState.selectedConfusionCell?.col === c;
+      const label = `واقعی ${data.displayLabels[r]}، پیش‌بینی ${data.displayLabels[c]}، تعداد ${count}، ${correct ? 'درست' : 'خطا'}`;
+      cells.push(`<button type="button" class="cm-cell ${correct ? 'cm-correct' : 'cm-error'} ${selected ? 'selected' : ''}" style="--intensity:${intensity}" aria-label="${escapeHtml(label)}" onclick="selectConfusionCell(${r},${c})"><strong>${formatNumber(count)}</strong><span>${percent(pct)}</span></button>`);
+    });
+  });
+  target.innerHTML = `<div class="cm-wrap" style="grid-template-columns: minmax(88px, 1fr) repeat(${cols - 1}, minmax(82px, 1fr));">${cells.join('')}</div><div class="cm-legend"><span><i class="legend-correct"></i>قطر اصلی: درست</span><span><i class="legend-error"></i>بیرون قطر: خطا</span><span>رنگ پررنگ‌تر = تعداد بیشتر</span></div>`;
+}
+function selectConfusionCell(row, col){
+  vizState.selectedConfusionCell = {row, col};
+  const data = vizState.confusion || buildConfusionMatrix();
+  const count = data.matrix[row][col];
+  const correct = row === col;
+  const examples = data.members[row][col].slice(0, 6);
+  setPanel('pointPanel', `<b>${correct ? 'خانه درست در ماتریس خطا' : 'خانه خطا در ماتریس خطا'}</b><div class="fact-grid"><span>کلاس واقعی</span><strong>${escapeHtml(data.displayLabels[row])}</strong><span>کلاس پیش‌بینی</span><strong>${escapeHtml(data.displayLabels[col])}</strong><span>تعداد</span><strong>${formatNumber(count)}</strong><span>برداشت</span><strong>${correct ? 'درست' : 'خطا'}</strong></div>${correct ? '' : '<p class="warn">این نوع خطا نشان می‌دهد مدل این دو کلاس را با هم اشتباه می‌گیرد.</p>'}<div class="mini-list">${examples.map(i=>`<button onclick="selectPointByRawIndex(${i})"><span>#${i}</span><span>${escapeHtml(data.displayLabels[row])} → ${escapeHtml(data.displayLabels[col])}</span><b>${correct ? 'درست' : 'خطا'}</b></button>`).join('') || '<p>نمونه‌ای برای این خانه وجود ندارد.</p>'}</div>`);
+  drawConfusionMatrix();
 }
 function tooltipForPoint(p){
   if(isRegression()) return [`قیمت واقعی: ${formatMoney(p.actual)}`, `قیمت پیش‌بینی‌شده: ${formatMoney(p.predicted)}`, `خطا: ${formatSignedMoney(p.error)}`, `نوع خطا: ${direction(p.error)}`, `سطح خطا: ${severityFa[p.severity]}`];
@@ -228,7 +281,7 @@ function selectPoint(index){
   const binIndex = isRegression() ? findBin(p.error) : findClassBin(p);
   setPanel('pointPanel', `<b>${isRegression()?'جزئیات پیش‌بینی':'جزئیات طبقه‌بندی'}</b><div class="fact-grid"><span>واقعی</span><strong>${valueText(p.actual)}</strong><span>پیش‌بینی</span><strong>${valueText(p.predicted)}</strong><span>خطا</span><strong>${isRegression()?formatSignedMoney(p.error):formatSigned(p.error)}</strong><span>برداشت</span><strong>${isRegression()?direction(p.error):(classOutcome(p)?'درست':'غلط')}</strong></div><p>${isRegression()?`این نمونه ${severityFa[p.severity]} خطا دارد و به بازه خطای انتخاب‌شده وصل شد.`:'در طبقه‌بندی، درست بودن کلاس از فاصله عددی مهم‌تر است.'}</p>`);
   selectBin(binIndex, false);
-  charts.scatter.update();
+  charts.scatter?.update();
 }
 
 function drawErrors(){
@@ -283,7 +336,7 @@ function classificationSummary(v){
 function findBin(error){ return Math.min(vizState.bins.counts.length-1, Math.max(0, Math.floor((Number(error)-vizState.bins.min)/vizState.bins.step))); }
 function findClassBin(p){ return classOutcome(p) ? 0 : 1; }
 function resetPanels(){
-  setPanel('pointPanel','برای دیدن واقعی، پیش‌بینی، خطا و تفسیر، یک نقطه را انتخاب کنید.');
+  setPanel('pointPanel', isRegression() ? 'برای دیدن واقعی، پیش‌بینی، خطا و تفسیر، یک نقطه را انتخاب کنید.' : 'یک خانه از ماتریس خطا را انتخاب کنید تا جزئیات کلاس واقعی، کلاس پیش‌بینی‌شده و نمونه‌ها نمایش داده شود.');
   setPanel('binPanel', isRegression() ? 'یک ستون خطا را انتخاب کنید تا نمونه‌های آن بازه نمایش داده شود.' : 'ستون درست یا غلط را انتخاب کنید تا نمونه‌ها نمایش داده شوند.');
   setPanel('featurePanel','یک ویژگی را انتخاب کنید تا معنی اهمیت و محدودیت آن را ببینید.');
 }
