@@ -165,13 +165,13 @@ function explainMetric(metric, value){
 
 async function drawCharts(){
   const v = await api('/api/visualization?'+params());
-  destroy('scatter'); destroy('errors'); destroy('importance'); destroy('classwisePerformance'); destroy('confidenceDistribution');
+  destroy('scatter'); destroy('errors'); destroy('importance'); destroy('classwisePerformance'); destroy('confidenceDistribution'); destroy('simplex');
   const maxAbsError = Math.max(...v.errors.map(e=>Math.abs(Number(e))), 1);
   const points = isRegression()
     ? v.actual.map((a,i)=>({x:a,y:v.predicted[i], actual:a, predicted:v.predicted[i], error:v.errors[i], index:i, severity:severity(v.errors[i], maxAbsError)})).slice(0,400)
     : v.actual.map((a,i)=>{ const ok = v.is_correct?.[i] ?? Number(a) === Number(v.predicted[i]); return {x:ok ? 'درست' : 'غلط', y:ok ? 1 : 0, actual:v.actual_class?.[i] ?? a, predicted:v.predicted_class?.[i] ?? v.predicted[i], error:v.errors[i], index:i, is_correct:ok, severity:ok ? 'low' : 'high'}; }).slice(0,400);
   const bins = isRegression() ? histogram(v.errors, 20, formatMoney) : classificationSummary(v);
-  vizState = {raw:v, points, bins, maxAbsError, selectedPoint:null, selectedBin:null, selectedFeature:null, selectedConfusionCell:null, selectedClass:null, selectedConfidenceBin:null, selectedMistake:null};
+  vizState = {raw:v, points, bins, maxAbsError, selectedPoint:null, selectedBin:null, selectedFeature:null, selectedConfusionCell:null, selectedClass:null, selectedConfidenceBin:null, selectedMistake:null, selectedSimplexPoint:null};
   $('taskLesson').textContent = isRegression() ? 'رگرسیون یعنی فاصله عدد پیش‌بینی‌شده با مقدار واقعی را می‌آموزیم.' : 'طبقه‌بندی یعنی درستی کلاس و احتمال انتخاب‌شده را بررسی می‌کنیم.';
   $('scatterTitle').textContent = isRegression() ? 'قیمت واقعی در برابر قیمت پیش‌بینی‌شده' : 'ماتریس خطای طبقه‌بندی (Confusion Matrix)';
   $('errorTitle').textContent = isRegression() ? 'توزیع خطای پیش‌بینی (Prediction Error Distribution)' : 'تعداد پیش‌بینی‌های درست و غلط';
@@ -323,6 +323,70 @@ function selectFeature(index){
   charts.importance.update();
 }
 
+
+const classPalette = ['#2563eb', '#14b8a6', '#7c3aed', '#f59e0b', '#ec4899', '#0ea5e9'];
+function classColor(classId, order=[]){
+  const index = order.map(String).indexOf(String(classId));
+  return classPalette[(index >= 0 ? index : Math.abs(String(classId).split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0))) % classPalette.length];
+}
+function classOrderForProbabilities(raw){
+  const probabilities = raw?.class_probabilities || [];
+  const first = probabilities.find(p=>p && Object.keys(p).length);
+  const labels = raw?.confusion_matrix?.labels;
+  if(Array.isArray(labels)) return labels.map(String);
+  return first ? Object.keys(first).map(String).sort((a,b)=>Number(a)-Number(b) || a.localeCompare(b)) : [];
+}
+function simplexPoint(probabilityDict, classOrder){
+  if(!probabilityDict || classOrder.length !== 3) return null;
+  const p0 = Number(probabilityDict[classOrder[0]]), p1 = Number(probabilityDict[classOrder[1]]), p2 = Number(probabilityDict[classOrder[2]]);
+  if(![p0,p1,p2].every(Number.isFinite)) return null;
+  const total = p0 + p1 + p2 || 1;
+  return {x:(p1 + p2 * 0.5) / total, y:(p2 * 0.866) / total, probabilities:[p0/total, p1/total, p2/total]};
+}
+function simplexTooltip(point){
+  return [
+    `واقعی: ${classLabelFor(point.actual)}`,
+    `پیش‌بینی: ${classLabelFor(point.predicted)}`,
+    ...point.classOrder.map((id,i)=>`${classLabelFor(id)}: ${percent(point.probabilities[i])}`),
+    point.is_correct ? 'وضعیت: درست' : 'وضعیت: غلط'
+  ];
+}
+function drawProbabilitySimplex(){
+  const canvas = $('probabilitySimplex'), fallback = $('simplexFallback'), panel = $('simplexPanel');
+  const probabilities = vizState.raw.class_probabilities || [];
+  if(!probabilities.length){ canvas.hidden = true; fallback.hidden = false; panel.hidden = true; fallback.textContent = 'این مدل احتمال کلاس‌ها را ارائه نمی‌کند، بنابراین مثلث احتمال در دسترس نیست.'; return; }
+  const classOrder = classOrderForProbabilities(vizState.raw);
+  if(classOrder.length !== 3){ canvas.hidden = true; fallback.hidden = false; panel.hidden = true; fallback.textContent = 'این نمودار فقط برای طبقه‌بندی سه‌کلاسه فعال است.'; return; }
+  canvas.hidden = false; fallback.hidden = true; panel.hidden = false;
+  const points = probabilities.map((probabilityDict, i)=>{
+    const point = simplexPoint(probabilityDict, classOrder);
+    if(!point) return null;
+    const actual = vizState.raw.actual_class?.[i] ?? vizState.raw.actual?.[i];
+    const predicted = vizState.raw.predicted_class?.[i] ?? vizState.raw.predicted?.[i];
+    const ok = vizState.raw.is_correct?.[i] ?? String(actual) === String(predicted);
+    const confidence = Math.max(...point.probabilities);
+    return {...point, index:i, actual, predicted, is_correct:ok, confidence, classOrder};
+  }).filter(Boolean).slice(0,400);
+  vizState.simplexPoints = points;
+  const labelPlugin = {id:'simplexCornerLabels', afterDatasetsDraw(chart){
+    const {ctx, scales:{x,y}} = chart; ctx.save(); ctx.font = '700 12px Tahoma, Arial'; ctx.fillStyle = '#0f172a'; ctx.textAlign = 'center';
+    [[0,0,classOrder[0],8],[1,0,classOrder[1],8],[0.5,0.866,classOrder[2],-10]].forEach(([vx,vy,id,dy])=>ctx.fillText(classLabelFor(id), x.getPixelForValue(vx), y.getPixelForValue(vy)+dy)); ctx.restore();
+  }};
+  charts.simplex = new Chart(canvas, {type:'scatter', data:{datasets:[
+    {label:'مرز مثلث احتمال', type:'line', data:[{x:0,y:0},{x:1,y:0},{x:0.5,y:0.866},{x:0,y:0}], borderColor:'rgba(15,23,42,.5)', borderWidth:2, pointRadius:0, fill:false, order:0},
+    {label:'نقطه‌ها: رنگ = کلاس پیش‌بینی‌شده، دورخط نارنجی/قرمز = خطا', data:points, order:1, pointRadius:c=>c.raw.index===vizState.selectedSimplexPoint?8:(!c.raw.is_correct && c.raw.confidence >= .75 ? 7:4.5), pointHoverRadius:8, pointHitRadius:10, backgroundColor:c=>classColor(c.raw.predicted, classOrder), borderColor:c=>c.raw.is_correct?'#334155':'#f97316', borderWidth:c=>c.raw.is_correct?1.5:(c.raw.confidence >= .75 ? 4:3)}
+  ]}, options:{parsing:false, maintainAspectRatio:false, animation:false, interaction:{mode:'nearest', intersect:true}, plugins:{legend:{display:true}, tooltip:{filter:item=>item.datasetIndex===1, callbacks:{label:c=>simplexTooltip(c.raw)}}}, onClick:(evt)=>{ const hit=charts.simplex.getElementsAtEventForMode(evt,'nearest',{intersect:true},true).find(item=>item.datasetIndex===1); if(hit) selectSimplexPoint(hit.index); }, scales:{x:{min:-.08,max:1.08,title:{display:true,text:'ترکیب احتمال کلاس‌ها'}, grid:{color:'rgba(148,163,184,.18)'}}, y:{min:-.08,max:.96,grid:{color:'rgba(148,163,184,.18)'}}}}, plugins:[labelPlugin]});
+}
+function selectSimplexPoint(index){
+  const p = vizState.simplexPoints?.[index]; if(!p) return;
+  vizState.selectedSimplexPoint = p.index;
+  const probs = p.classOrder.map((id,i)=>`<span>${escapeHtml(classLabelFor(id))}</span><strong>${percent(p.probabilities[i])}</strong>`).join('');
+  const message = p.is_correct ? 'این نقطه نشان می‌دهد مدل بیشترین احتمال را به کلاس درست داده است.' : 'این نقطه یک خطای هندسی مهم است؛ اگر نزدیک گوشه باشد یعنی مدل با اطمینان بالا اشتباه کرده است.';
+  setPanel('simplexPanel', `<b>نمونه #${formatNumber(p.index)}</b><div class="fact-grid"><span>واقعی</span><strong>${escapeHtml(classLabelFor(p.actual))}</strong><span>پیش‌بینی</span><strong>${escapeHtml(classLabelFor(p.predicted))}</strong><span>اطمینان</span><strong>${percent(p.confidence)}</strong><span>وضعیت</span><strong>${p.is_correct?'درست':'غلط'}</strong>${probs}</div><p class="${p.is_correct?'':'warn'}">${message}</p>`);
+  setPanel('pointPanel', `<b>جزئیات نقطه مثلث احتمال #${formatNumber(p.index)}</b><div class="fact-grid"><span>واقعی</span><strong>${escapeHtml(classLabelFor(p.actual))}</strong><span>پیش‌بینی</span><strong>${escapeHtml(classLabelFor(p.predicted))}</strong><span>برداشت</span><strong>${p.is_correct?'درست':'غلط'}</strong></div><p>${message}</p>`);
+  charts.simplex?.update();
+}
+
 function classLabelFor(value){
   const key = String(value);
   return vizState?.raw?.class_labels?.[key] || `کلاس ${key}`;
@@ -339,11 +403,12 @@ function drawClassificationLayer(){
   const layer = $('classificationAnalysisLayer');
   layer.hidden = isRegression();
   if(isRegression()){
-    $('classwiseSummary').innerHTML = ''; $('confidentMistakes').innerHTML = '';
+    $('classwiseSummary').innerHTML = ''; $('confidentMistakes').innerHTML = ''; $('simplexFallback').textContent = '';
     return;
   }
   drawClasswisePerformance();
   drawConfidenceDistribution();
+  drawProbabilitySimplex();
   renderConfidentMistakes();
 }
 function drawClasswisePerformance(){

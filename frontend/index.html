@@ -127,6 +127,13 @@
         <div id="confidenceFallback" class="insight-panel" hidden></div>
         <div id="confidencePanel" class="insight-panel">یک بازه اطمینان را انتخاب کنید تا جزئیات نمونه‌ها نمایش داده شود.</div>
       </article>
+      <article class="chart-card simplex-card">
+        <h3>مثلث احتمال کلاس‌ها (Probability Simplex)</h3>
+        <p class="chart-help">هر گوشه یعنی مدل به یک کلاس مطمئن است؛ نقاط نزدیک مرکز یعنی مدل بین کلاس‌ها مردد است.</p>
+        <canvas id="probabilitySimplex"></canvas>
+        <div id="simplexFallback" class="insight-panel" hidden></div>
+        <div id="simplexPanel" class="insight-panel">رنگ نقطه‌ها کلاس پیش‌بینی‌شده را نشان می‌دهد؛ دورخط قرمز/نارنجی یعنی پیش‌بینی غلط است.</div>
+      </article>
       <article class="chart-card mistakes-card">
         <h3>اشتباه‌های پر اطمینان (Top Confident Mistakes)</h3>
         <p class="warn">این نمونه‌ها مهم‌اند چون مدل با اطمینان بالا اشتباه کرده است.</p>
