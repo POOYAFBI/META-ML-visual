@@ -1,36 +1,35 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
 from .services.model_loader import available_options, load_bundle
 from .services.predictor import predict
 from .services.metrics import evaluation, feature_importance
 from .services.comparison import comparison
 from .services.inputs import list_presets, list_samples, preset_features, sample_features
 from .services.feature_metadata import feature_meta
+from .schemas import (
+    ComparisonResponse,
+    FeaturesResponse,
+    MetricsResponse,
+    PredictRequest,
+    PredictResponse,
+    PresetsResponse,
+    SamplesResponse,
+    VisualizationResponse,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 app = FastAPI(title="Persian ML Housing App")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-class PredictRequest(BaseModel):
-    task: str
-    dataset: str
-    model: str
-    features: dict[str, Any] = Field(default_factory=dict)
-    input_mode: str = "advanced"
-    preset_id: str | None = None
-    sample_id: str | None = None
-
 @app.get("/api/options")
 def options():
     return available_options()
 
-@app.get("/api/features")
+@app.get("/api/features", response_model=FeaturesResponse)
 def features(task: str = Query(...), dataset: str = Query(...), model: str = Query(...)):
     try:
         bundle = load_bundle(task, dataset, model)
@@ -38,21 +37,21 @@ def features(task: str = Query(...), dataset: str = Query(...), model: str = Que
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
-@app.get("/api/presets")
+@app.get("/api/presets", response_model=PresetsResponse)
 def presets(task: str, dataset: str):
     try:
         return {"presets": list_presets(task, dataset)}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-@app.get("/api/samples")
+@app.get("/api/samples", response_model=SamplesResponse)
 def samples(task: str, dataset: str, model: str, limit: int = 10):
     try:
         return {"samples": list_samples(task, dataset, model, limit)}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-@app.post("/api/predict")
+@app.post("/api/predict", response_model=PredictResponse)
 def predict_endpoint(req: PredictRequest):
     try:
         features = req.features
@@ -68,14 +67,14 @@ def predict_endpoint(req: PredictRequest):
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-@app.get("/api/comparison")
+@app.get("/api/comparison", response_model=ComparisonResponse)
 def comparison_endpoint(task: str = Query(...)):
     try:
         return comparison(task)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-@app.get("/api/metrics")
+@app.get("/api/metrics", response_model=MetricsResponse)
 def metrics(task: str, dataset: str, model: str):
     try:
         ev = evaluation(task, dataset, model)
@@ -83,7 +82,7 @@ def metrics(task: str, dataset: str, model: str):
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-@app.get("/api/visualization")
+@app.get("/api/visualization", response_model=VisualizationResponse)
 def visualization(task: str, dataset: str, model: str):
     try:
         ev = evaluation(task, dataset, model)
