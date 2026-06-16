@@ -124,7 +124,22 @@ def list_samples(task: str, dataset: str, model_name: str, limit: int = 10) -> l
 
 
 def sample_features(task: str, dataset: str, model_name: str, sample_id: str) -> dict[str, float]:
-    for sample in list_samples(task, dataset, model_name, limit=25):
-        if sample["id"] == str(sample_id):
-            return sample["features"]
-    raise ValueError(f"Unknown sample '{sample_id}' for task={task}, dataset={dataset}")
+    bundle = load_bundle(task, dataset, model_name)
+
+    try:
+        row_index = int(sample_id)
+    except (TypeError, ValueError):
+        raise ValueError("sample_id must be an integer row index")
+
+    if row_index < 0:
+        raise ValueError("sample_id must be non-negative")
+
+    with bundle["data_path"].open(newline="", encoding="utf-8") as fh:
+        for current_index, row in enumerate(csv.DictReader(fh)):
+            if current_index == row_index:
+                return {
+                    name: coerce_value(row.get(name, 0.0))
+                    for name in bundle["features"]
+                }
+
+    raise ValueError(f"Unknown sample_id '{sample_id}' for task={task}, dataset={dataset}")
