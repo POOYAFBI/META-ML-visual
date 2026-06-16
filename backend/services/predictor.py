@@ -66,8 +66,17 @@ def predict(task: str, dataset: str, model_name: str, inputs: dict[str, Any]) ->
         prediction = float(pred)
         result.update({
             "error_estimate": {"metric": "RMSE", "value": rmse},
-            "prediction_range": {"lower": prediction - rmse, "upper": prediction + rmse},
+            "prediction_range": {
+                "lower": prediction - rmse,
+                "upper": prediction + rmse,
+                "basis": "±1 RMSE",
+                "metric": "RMSE",
+                "metric_value": rmse,
+            },
             "confidence": confidence,
+            "confidence_basis": "RMSE / mean target price",
+            "confidence_label": "RMSE-based Confidence",
+            "confidence_explanation": "این عدد احتمال درست بودن نیست؛ از نسبت RMSE به میانگین قیمت ساخته شده است.",
             "analysis": _analysis(confidence, task_type),
         })
         return result
