@@ -62,8 +62,18 @@ async function loadAll(){
   switchMode(); await drawCharts();
 }
 
+const metricDisplay = {
+  rmse: {title: 'میانگین خطا', original: 'RMSE', format: formatMoney, caption: 'هرچه کمتر بهتر؛ میانگین اندازه خطاهای مدل را نشان می‌دهد.'},
+  r2: {title: 'قدرت توضیح مدل', original: 'R²', format: percent, caption: 'هرچه به ۱۰۰٪ نزدیک‌تر بهتر؛ سهم تغییرات توضیح‌داده‌شده توسط مدل است.'},
+  accuracy: {title: 'دقت', original: 'Accuracy', format: percent, caption: 'هرچه به ۱۰۰٪ نزدیک‌تر بهتر؛ سهم پیش‌بینی‌های درست را نشان می‌دهد.'},
+  f1: {title: 'امتیاز F1', original: 'F1', format: percent, caption: 'هرچه به ۱۰۰٪ نزدیک‌تر بهتر؛ تعادل دقت و پوشش کلاس‌ها را خلاصه می‌کند.'}
+};
+
 function renderMetrics(metrics){
-  $('metrics').innerHTML = Object.entries(metrics).map(([k,v])=>`<button class="metric-chip" data-metric="${k}"><b>${k}</b><span>${Number(v).toFixed(4)}</span></button>`).join('');
+  $('metrics').innerHTML = Object.entries(metrics).map(([k,v])=>{
+    const meta = metricDisplay[k] || {title: k, original: k, format: value=>Number(value).toFixed(4), caption: 'معیار تکمیلی مدل برای ارزیابی عملکرد.'};
+    return `<button class="metric-chip" data-metric="${escapeHtml(k)}"><span class="metric-title">${escapeHtml(meta.title)} <small>${escapeHtml(meta.original)}</small></span><span class="metric-value">${escapeHtml(meta.format(v))}</span><span class="metric-caption">${escapeHtml(meta.caption)}</span></button>`;
+  }).join('');
   document.querySelectorAll('.metric-chip').forEach(btn=>btn.onclick=()=>explainMetric(btn.dataset.metric, metrics[btn.dataset.metric]));
 }
 function explainMetric(metric, value){
