@@ -127,6 +127,18 @@
         <div id="confidenceFallback" class="insight-panel" hidden></div>
         <div id="confidencePanel" class="insight-panel">یک بازه اطمینان را انتخاب کنید تا جزئیات نمونه‌ها نمایش داده شود.</div>
       </article>
+      <article class="chart-card decision-boundary-card">
+        <h3>مرز تصمیم مدل (Decision Boundary)</h3>
+        <p class="chart-help">پس‌زمینه نشان می‌دهد مدل در هر ناحیه کدام کلاس را انتخاب می‌کند؛ نقطه‌ها نمونه‌های واقعی دیتاست هستند.</p>
+        <div class="decision-controls">
+          <label>X feature<select id="decisionXFeature"></select></label>
+          <label>Y feature<select id="decisionYFeature"></select></label>
+        </div>
+        <div id="decisionBoundaryLoading" class="loading" hidden>در حال محاسبه مرز تصمیم...</div>
+        <div id="decisionBoundaryError" class="insight-panel error-state" hidden></div>
+        <canvas id="decisionBoundary"></canvas>
+        <div id="decisionBoundaryPanel" class="insight-panel">یک نقطه از مرز تصمیم را انتخاب کنید.</div>
+      </article>
       <article class="chart-card simplex-card">
         <h3>مثلث احتمال کلاس‌ها (Probability Simplex)</h3>
         <p class="chart-help">هر گوشه یعنی مدل به یک کلاس مطمئن است؛ نقاط نزدیک مرکز یعنی مدل بین کلاس‌ها مردد است.</p>

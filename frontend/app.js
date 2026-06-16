@@ -1,5 +1,6 @@
 const $ = id => document.getElementById(id);
 let charts = {}, currentFeatures = [], currentPresets = [], currentSamples = [], vizState = null, lastPrediction = null;
+let decisionSurfaceState = {data:null, loading:false, error:null, selectedPoint:null};
 const modelDisplay = {
   linear_regression: {labelFa: 'رگرسیون خطی', labelEn: 'Linear Regression', raw: 'linear_regression', short: 'Linear'},
   logistic_regression: {labelFa: 'رگرسیون لجستیک', labelEn: 'Logistic Regression', raw: 'logistic_regression', short: 'Logistic'},
@@ -165,7 +166,7 @@ function explainMetric(metric, value){
 
 async function drawCharts(){
   const v = await api('/api/visualization?'+params());
-  destroy('scatter'); destroy('errors'); destroy('importance'); destroy('classwisePerformance'); destroy('confidenceDistribution'); destroy('simplex');
+  destroy('scatter'); destroy('errors'); destroy('importance'); destroy('classwisePerformance'); destroy('confidenceDistribution'); destroy('simplex'); destroy('decisionBoundary');
   const maxAbsError = Math.max(...v.errors.map(e=>Math.abs(Number(e))), 1);
   const points = isRegression()
     ? v.actual.map((a,i)=>({x:a,y:v.predicted[i], actual:a, predicted:v.predicted[i], error:v.errors[i], index:i, severity:severity(v.errors[i], maxAbsError)})).slice(0,400)
@@ -403,13 +404,15 @@ function drawClassificationLayer(){
   const layer = $('classificationAnalysisLayer');
   layer.hidden = isRegression();
   if(isRegression()){
-    $('classwiseSummary').innerHTML = ''; $('confidentMistakes').innerHTML = ''; $('simplexFallback').textContent = '';
+    $('classwiseSummary').innerHTML = ''; $('confidentMistakes').innerHTML = ''; $('simplexFallback').textContent = ''; destroy('decisionBoundary');
     return;
   }
   drawClasswisePerformance();
   drawConfidenceDistribution();
   drawProbabilitySimplex();
   renderConfidentMistakes();
+  setupDecisionFeatureSelectors();
+  loadDecisionSurface();
 }
 function drawClasswisePerformance(){
   const items = classwiseItems();
@@ -474,6 +477,69 @@ function selectConfidentMistake(index){
   const row = data.labels.findIndex(x=>String(x)===String(m.actual)); const col = data.labels.findIndex(x=>String(x)===String(m.predicted));
   if(row >= 0 && col >= 0){ vizState.selectedConfusionCell = {row,col}; drawConfusionMatrix(); }
   renderConfidentMistakes();
+}
+
+function decisionFeatureName(feature){ return feature?.rawName || feature?.name || feature?.raw_feature || feature; }
+function isOneHotFeature(feature){ return feature?.inputKind === 'oneHotOption' || String(decisionFeatureName(feature)).includes('_'); }
+function selectDefaultDecisionFeatures(){
+  const names = currentFeatures.map(decisionFeatureName);
+  if(names.includes('GrLivArea') && names.includes('OverallQual')) return ['GrLivArea', 'OverallQual'];
+  const numeric = currentFeatures.filter(f=>f.type === 'number' && !isOneHotFeature(f)).map(decisionFeatureName);
+  const fallback = numeric.length >= 2 ? numeric : names;
+  return [fallback[0], fallback[1] || fallback[0]].filter(Boolean);
+}
+function setupDecisionFeatureSelectors(){
+  const xSel = $('decisionXFeature'), ySel = $('decisionYFeature');
+  if(!xSel || !ySel) return;
+  const options = currentFeatures.map(f=>`<option value="${escapeHtml(decisionFeatureName(f))}">${escapeHtml(humanizeFeatureName(f))}</option>`).join('');
+  const previous = [xSel.value, ySel.value];
+  xSel.innerHTML = options; ySel.innerHTML = options;
+  const defaults = selectDefaultDecisionFeatures();
+  xSel.value = currentFeatures.some(f=>decisionFeatureName(f)===previous[0]) ? previous[0] : defaults[0];
+  ySel.value = currentFeatures.some(f=>decisionFeatureName(f)===previous[1]) ? previous[1] : defaults[1];
+  xSel.onchange = loadDecisionSurface;
+  ySel.onchange = loadDecisionSurface;
+}
+async function loadDecisionSurface(){
+  if(isRegression()) return;
+  const x = $('decisionXFeature')?.value, y = $('decisionYFeature')?.value;
+  if(!x || !y) return;
+  const loading = $('decisionBoundaryLoading'), error = $('decisionBoundaryError'), canvas = $('decisionBoundary');
+  decisionSurfaceState = {data:null, loading:true, error:null, selectedPoint:null};
+  loading.hidden = false; error.hidden = true; canvas.hidden = true; destroy('decisionBoundary');
+  try{
+    const data = await api(`/api/decision-surface?${params()}&x_feature=${encodeURIComponent(x)}&y_feature=${encodeURIComponent(y)}`);
+    decisionSurfaceState = {data, loading:false, error:null, selectedPoint:null};
+    loading.hidden = true; canvas.hidden = false;
+    drawDecisionBoundary();
+  }catch(e){
+    decisionSurfaceState = {data:null, loading:false, error:e.message, selectedPoint:null};
+    loading.hidden = true; error.hidden = false; canvas.hidden = true;
+    error.textContent = `مرز تصمیم در دسترس نیست: ${e.message}`;
+  }
+}
+function decisionClassLabel(value){ return decisionSurfaceState.data?.class_labels?.[String(value)] || classLabelFor(value); }
+function decisionTooltip(point){ return [`واقعی: ${decisionClassLabel(point.actual)}`, `پیش‌بینی: ${decisionClassLabel(point.predicted)}`, `وضعیت: ${point.is_correct ? 'درست' : 'غلط'}`, `${decisionSurfaceState.data.x_feature}: ${formatNumber(point.x)}`, `${decisionSurfaceState.data.y_feature}: ${formatNumber(point.y)}`]; }
+function drawDecisionBoundary(){
+  const data = decisionSurfaceState.data; if(!data) return;
+  const classOrder = data.classes.map(String);
+  const backgroundPlugin = {id:'decisionRegionBackground', beforeDatasetsDraw(chart){
+    const {ctx, chartArea, scales:{x,y}} = chart; if(!chartArea) return;
+    const w = Math.abs(x.getPixelForValue(data.x_range[1]) - x.getPixelForValue(data.x_range[0])) / data.grid_size;
+    const h = Math.abs(y.getPixelForValue(data.y_range[1]) - y.getPixelForValue(data.y_range[0])) / data.grid_size;
+    ctx.save();
+    data.grid.forEach(cell=>{ ctx.fillStyle = `${classColor(cell.predicted_class, classOrder)}33`; ctx.fillRect(x.getPixelForValue(cell.x)-w/2, y.getPixelForValue(cell.y)-h/2, w+1, h+1); });
+    ctx.restore();
+  }};
+  charts.decisionBoundary = new Chart($('decisionBoundary'), {type:'scatter', data:{datasets:[{label:'نمونه‌های واقعی', data:data.points, pointRadius:c=>c.raw===decisionSurfaceState.selectedPoint?7:4, pointHoverRadius:7, pointHitRadius:10, backgroundColor:c=>classColor(c.raw.actual, classOrder), borderColor:c=>c.raw.is_correct?'#334155':'#f97316', borderWidth:c=>c.raw.is_correct?1.4:3}]}, options:{parsing:false, maintainAspectRatio:false, animation:false, plugins:{legend:{display:true}, tooltip:{callbacks:{label:c=>decisionTooltip(c.raw)}}}, onClick:(evt)=>{ const hit=charts.decisionBoundary.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectDecisionPoint(hit.index); }, scales:{x:{min:data.x_range[0], max:data.x_range[1], title:{display:true,text:data.x_feature}}, y:{min:data.y_range[0], max:data.y_range[1], title:{display:true,text:data.y_feature}}}}, plugins:[backgroundPlugin]});
+}
+function selectDecisionPoint(index){
+  const p = decisionSurfaceState.data?.points?.[index]; if(!p) return;
+  decisionSurfaceState.selectedPoint = p;
+  const message = p.is_correct ? 'این نمونه در ناحیه‌ای قرار گرفته که مدل کلاس واقعی را انتخاب می‌کند.' : 'این نمونه روی ناحیه‌ای قرار گرفته که تصمیم مدل با کلاس واقعی تفاوت دارد.';
+  setPanel('decisionBoundaryPanel', `<b>نمونه مرز تصمیم</b><div class="fact-grid"><span>${escapeHtml(decisionSurfaceState.data.x_feature)}</span><strong>${formatNumber(p.x)}</strong><span>${escapeHtml(decisionSurfaceState.data.y_feature)}</span><strong>${formatNumber(p.y)}</strong><span>واقعی</span><strong>${escapeHtml(decisionClassLabel(p.actual))}</strong><span>پیش‌بینی</span><strong>${escapeHtml(decisionClassLabel(p.predicted))}</strong><span>وضعیت</span><strong>${p.is_correct?'درست':'غلط'}</strong></div><p class="${p.is_correct?'':'warn'}">${message}</p>`);
+  setPanel('pointPanel', `<b>نقطه انتخاب‌شده از مرز تصمیم</b><p>${message}</p>`);
+  charts.decisionBoundary?.update();
 }
 
 function histogram(values, n, formatter=formatNumber){

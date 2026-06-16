@@ -8,6 +8,7 @@ from .services.model_loader import available_options, load_bundle
 from .services.predictor import predict
 from .services.metrics import evaluation, feature_importance
 from .services.comparison import comparison
+from .services.decision_surface import decision_surface
 from .services.inputs import list_presets, list_samples, preset_features, sample_features
 from .services.feature_metadata import feature_meta
 from .schemas import (
@@ -79,6 +80,21 @@ def metrics(task: str, dataset: str, model: str):
     try:
         ev = evaluation(task, dataset, model)
         return {"metrics": ev["metrics"], "feature_importance": feature_importance(task, dataset, model)}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/api/decision-surface")
+def decision_surface_endpoint(
+    task: str = Query(...),
+    dataset: str = Query(...),
+    model: str = Query(...),
+    x_feature: str = Query(...),
+    y_feature: str = Query(...),
+    grid_size: int = Query(40),
+):
+    try:
+        return decision_surface(task, dataset, model, x_feature, y_feature, grid_size)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
