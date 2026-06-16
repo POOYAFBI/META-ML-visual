@@ -220,11 +220,25 @@ function drawScatter(){
     }
   });
 }
+function normalizeClassLabelList(value){
+  if(Array.isArray(value)) return value.map(String);
+  if(value && typeof value === 'object') return Object.keys(value).map(String);
+  return [];
+}
+function normalizeDisplayLabels(displayLabels, labels){
+  if(Array.isArray(displayLabels)) return displayLabels.map(String);
+  if(displayLabels && typeof displayLabels === 'object') return labels.map(label=>String(displayLabels[String(label)] ?? label));
+  return labels.map(String);
+}
 function buildConfusionMatrix(){
   const cm = vizState.raw.confusion_matrix || {};
-  const rawLabels = cm.labels || vizState.raw.class_labels || Array.from(new Set([...(vizState.raw.actual_class || vizState.raw.actual || []), ...(vizState.raw.predicted_class || vizState.raw.predicted || [])]));
-  const labels = rawLabels.map(String);
-  const displayLabels = (cm.display_labels || rawLabels).map(String);
+  const fallbackLabels = Array.from(new Set([...(vizState.raw.actual_class || vizState.raw.actual || []), ...(vizState.raw.predicted_class || vizState.raw.predicted || [])])).map(String);
+  const labels = normalizeClassLabelList(cm.labels).length
+    ? normalizeClassLabelList(cm.labels)
+    : normalizeClassLabelList(vizState.raw.class_labels).length
+      ? normalizeClassLabelList(vizState.raw.class_labels)
+      : fallbackLabels;
+  const displayLabels = normalizeDisplayLabels(cm.display_labels || vizState.raw.class_labels, labels);
   const matrix = cm.matrix ? cm.matrix.map(row=>row.map(Number)) : labels.map(()=>labels.map(()=>0));
   const members = labels.map(()=>labels.map(()=>[]));
   const actual = vizState.raw.actual_class || vizState.raw.actual || [];
