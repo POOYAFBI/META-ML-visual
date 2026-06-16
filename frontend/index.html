@@ -26,9 +26,9 @@
     <section class="card">
       <h2>ورودی پیش‌بینی</h2>
       <p id="featureCount"></p>
-      <div id="presetPanel" class="mode-panel"><label>پروفایل ملک<select id="preset"></select></label><p id="presetHelp"></p></div>
-      <div id="samplePanel" class="mode-panel"><label>ردیف واقعی دیتاست<select id="sample"></select></label><p id="sampleHelp"></p></div>
-      <div id="advancedPanel" class="mode-panel"><div id="form" class="form"></div></div>
+      <div id="presetPanel" class="mode-panel"><label>پروفایل ملک<select id="preset"></select></label><div id="presetPreview" class="preview-card"></div></div>
+      <div id="samplePanel" class="mode-panel"><label>ردیف واقعی دیتاست<select id="sample"></select></label><div id="samplePreview" class="preview-card"></div></div>
+      <div id="advancedPanel" class="mode-panel"><details open class="advanced-raw"><summary>برای کاربران فنی (Advanced / Raw Features)</summary><p class="muted">کنار هر برچسب فارسی، نام خام feature مدل هم نمایش داده شده است.</p><div id="form" class="form"></div></details></div>
       <button id="predict">پیش‌بینی</button>
       <div id="loading" class="loading" hidden>در حال محاسبه پیش‌بینی...</div>
       <div id="resultCard" class="result-card empty-state">نتیجه پیش‌بینی اینجا نمایش داده می‌شود.</div>
