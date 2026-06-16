@@ -4,7 +4,11 @@ main{max-width:1250px;margin:auto;padding:24px}
 header{background:linear-gradient(135deg,#0f766e,#1d4ed8);color:white;border-radius:24px;padding:28px;margin-bottom:18px}
 .card{background:white;border-radius:18px;padding:20px;margin-bottom:18px;box-shadow:0 10px 28px #1f29371a}
 .controls{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;align-items:end}
-.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
+.prediction-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+.main-action-column{display:grid;gap:18px}
+.input-card,.result-shell,.metric-shell{margin-bottom:0}
+.section-heading{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:12px}
+.section-heading h2,.result-shell h2{margin:0}
 label{display:flex;flex-direction:column;gap:8px;font-weight:700}
 select,input,button{border:1px solid #cbd5e1;border-radius:12px;padding:11px;font:inherit}
 button{background:#2563eb;color:white;cursor:pointer;border:0;transition:.2s ease}
@@ -16,10 +20,10 @@ button:disabled{background:#94a3b8;cursor:wait;transform:none}
 .form input{direction:ltr}
 pre{white-space:pre-wrap;background:#0f172a;color:#dbeafe;border-radius:12px;padding:14px;direction:ltr;text-align:left;overflow:auto}
 .charts{display:grid;grid-template-columns:1fr;gap:26px}
-canvas{max-height:360px}
+canvas{display:block;width:100%;height:260px;max-height:300px}
 [hidden]{display:none!important}
 .loading{margin-top:14px;padding:12px 14px;border-radius:14px;background:#eff6ff;color:#1d4ed8;font-weight:700}
-.result-card{margin-top:16px;border:1px solid #e2e8f0;border-radius:22px;padding:20px;background:linear-gradient(180deg,#fff,#f8fafc);box-shadow:inset 0 1px 0 #ffffff;transition:.25s ease}
+.result-card{margin-top:14px;border:1px solid #dbeafe;border-radius:22px;padding:22px;background:linear-gradient(180deg,#fff,#f8fafc);box-shadow:inset 0 1px 0 #ffffff,0 18px 36px rgba(37,99,235,.10);transition:.25s ease}
 .empty-state{color:#64748b;text-align:center}
 .error-state{background:#fef2f2;color:#991b1b;border-color:#fecaca}
 .result-topline{display:flex;justify-content:space-between;gap:12px;align-items:center;color:#475569;font-weight:800}
@@ -44,9 +48,10 @@ canvas{max-height:360px}
 .analysis,.probabilities{border-top:1px solid #e2e8f0;margin-top:14px;padding-top:14px}
 .analysis p{margin:.5rem 0 0;color:#475569;line-height:1.9}
 .probability-row{display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border-radius:12px;padding:10px 12px;margin-top:8px}
-.technical-details{margin-top:14px}
-.technical-details summary{cursor:pointer;font-weight:800;color:#2563eb;padding:10px 0}
-@media(max-width:900px){.controls,.grid,.form,.info-panel{grid-template-columns:1fr}
+.technical-details{margin-top:12px;border-top:1px solid #e2e8f0;color:#64748b}
+.technical-details summary{cursor:pointer;font-weight:700;color:#64748b;padding:12px 0 4px;font-size:13px}
+@media(max-width:900px){.controls,.prediction-grid,.form,.info-panel{grid-template-columns:1fr}
+.section-heading{flex-direction:column}
 .result-topline{align-items:flex-start;flex-direction:column}
 .prediction-value{text-align:left}
 }
@@ -68,12 +73,13 @@ canvas{max-height:360px}
 .mini-list{display:grid;gap:8px;margin-top:10px}
 .mini-list button{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;background:white;color:#0f172a;border:1px solid #bfdbfe;text-align:right}
 .mini-list button:hover{background:#dbeafe;transform:none}
-.metric-chip{width:100%;display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center;background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0;margin-bottom:10px;text-align:right}
-.metric-chip:hover{background:#eff6ff;color:#1d4ed8;transform:none}
-.metric-title{font-weight:900;line-height:1.6}
-.metric-title small{direction:ltr;display:inline-block;color:#64748b;font-size:12px;font-weight:800;margin-right:6px}
-.metric-value{direction:ltr;text-align:left;font-size:18px;font-weight:900;color:#0f172a}
-.metric-caption{grid-column:1/-1;color:#64748b;font-size:12px;line-height:1.8}
+.metric-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.metric-card{width:100%;display:grid;grid-template-columns:1fr auto;gap:5px 12px;align-items:center;background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0;border-radius:16px;padding:12px;text-align:right;box-shadow:none}
+.metric-card:hover{background:#eff6ff;color:#1d4ed8;transform:none}
+.metric-label{font-weight:900;line-height:1.5}
+.metric-raw{direction:ltr;display:inline-block;color:#64748b;font-size:12px;font-weight:800;margin-right:6px}
+.metric-value{direction:ltr;text-align:left;font-size:17px;font-weight:900;color:#0f172a}
+.metric-caption{grid-column:1/-1;color:#64748b;font-size:12px;line-height:1.7}
 .warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px}
 .explainer small{display:block;color:#64748b;line-height:1.7;margin-top:8px}
 .probability-row{gap:12px}
@@ -82,7 +88,7 @@ canvas{max-height:360px}
 .range-line{cursor:help}
 .confidence-block{cursor:help}
 @media(max-width:900px){.chart-heading{flex-direction:column}.mini-list button{grid-template-columns:1fr}}
-.scatter-canvas{min-height:420px;max-height:520px}
+.scatter-canvas{height:320px;min-height:300px;max-height:360px}
 .preview-card{margin-top:12px;border:1px solid #dbeafe;background:white;border-radius:16px;padding:14px;box-shadow:inset 0 1px 0 #fff}
 .preview-card h3{margin:0 0 6px;color:#0f172a}
 .preview-card p{margin:0 0 12px;color:#475569;line-height:1.8}
