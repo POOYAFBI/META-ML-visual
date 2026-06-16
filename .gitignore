@@ -1,0 +1,28 @@
+# Data files - exclude small ones, include larger ones selectively
+# data/*.csv  # Commented out - can enable selectively
+
+# Model files - push in chunks to avoid timeouts
+# models/**/*.pkl
+# models/**/_scaler.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+
+# Results (optional - remove if you want them)
+# results/*.json
+# results/*.txt

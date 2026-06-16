@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+from typing import Any
+import numpy as np
+from .model_loader import load_bundle
+from .metrics import evaluation, mean_target_value
+
+
+def coerce_value(value: Any) -> float:
+    if isinstance(value, bool):
+        return float(value)
+    if value is None or value == "":
+        return 0.0
+    if isinstance(value, str):
+        if value.lower() in {"true", "yes"}: return 1.0
+        if value.lower() in {"false", "no"}: return 0.0
+    return float(value)
+
+
+def feature_vector(features: list[str], payload: dict[str, Any]) -> np.ndarray:
+    return np.array([[coerce_value(payload.get(name, 0.0)) for name in features]], dtype=float)
+
+
+def _confidence_label(confidence: float, task_type: str) -> tuple[str, str, str]:
+    basis = "خطای مدل (RMSE)" if task_type == "regression" else "احتمال کلاس پیش‌بینی‌شده"
+    if confidence > 0.8:
+        return "high", "High", f"این پیش‌بینی بر اساس {basis}، قابلیت اتکای بالایی دارد."
+    if confidence >= 0.5:
+        return "medium", "Medium", f"این پیش‌بینی بر اساس {basis}، قابلیت اتکای متوسطی دارد."
+    return "low", "Low", f"این پیش‌بینی بر اساس {basis}، قابلیت اتکای پایینی دارد."
+
+
+def _metadata(bundle: dict[str, Any]) -> dict[str, Any]:
+    info = bundle["info"]
+    return {
+        "model_name": info["model_name"],
+        "model_class": info.get("model_class"),
+        "task_type": info["task_type"],
+        "dataset_used": info["dataset_type"],
+    }
+
+
+def _analysis(confidence: float, task_type: str) -> dict[str, Any]:
+    level, label, explanation = _confidence_label(confidence, task_type)
+    return {"reliability": level, "label": label, "explanation": explanation}
+
+
+def predict(task: str, dataset: str, model_name: str, inputs: dict[str, Any]) -> dict[str, Any]:
+    bundle = load_bundle(task, dataset, model_name)
+    task_type = bundle["info"]["task_type"]
+    X = feature_vector(bundle["features"], inputs)
+    if bundle["scaler"] is not None:
+        X = bundle["scaler"].transform(X)
+
+    pred = bundle["model"].predict(X)[0]
+    result: dict[str, Any] = {
+        "prediction": float(pred) if task_type == "regression" else int(pred),
+        "model_metadata": _metadata(bundle),
+    }
+
+    if task_type == "regression":
+        rmse = float(evaluation(task_type, dataset, model_name)["metrics"]["rmse"])
+        mean_target = float(mean_target_value(task_type, dataset, model_name))
+        confidence = 0.0 if mean_target == 0 else 1 - (rmse / mean_target)
+        confidence = float(np.clip(confidence, 0.0, 1.0))
+        prediction = float(pred)
+        result.update({
+            "error_estimate": {"metric": "RMSE", "value": rmse},
+            "prediction_range": {"lower": prediction - rmse, "upper": prediction + rmse},
+            "confidence": confidence,
+            "analysis": _analysis(confidence, task_type),
+        })
+        return result
+
+    probabilities: dict[str, float] = {}
+    confidence = 1.0
+    if hasattr(bundle["model"], "predict_proba"):
+        probs = bundle["model"].predict_proba(X)[0]
+        classes = getattr(bundle["model"], "classes_", range(len(probs)))
+        probabilities = {str(cls): float(prob) for cls, prob in zip(classes, probs)}
+        confidence = float(np.max(probs))
+
+    result.update({
+        "predicted_class": int(pred),
+        "class_probabilities": probabilities,
+        "confidence": confidence,
+        "analysis": _analysis(confidence, task_type),
+    })
+    return result

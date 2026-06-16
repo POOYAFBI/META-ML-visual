@@ -1,0 +1,91 @@
+{
+  "model": "Random Forest",
+  "train_accuracy": 1.0,
+  "train_f1_macro": 1.0,
+  "test_accuracy": 0.8458904109589042,
+  "test_f1_macro": 0.8455274897368619,
+  "confusion_matrix": [
+    [
+      84,
+      12,
+      1
+    ],
+    [
+      12,
+      75,
+      9
+    ],
+    [
+      1,
+      10,
+      88
+    ]
+  ],
+  "f1_per_class": [
+    0.865979381443299,
+    0.7772020725388601,
+    0.8934010152284264
+  ],
+  "top_features": [
+    {
+      "feature": "TotalSF",
+      "importance": 0.08618922600485945
+    },
+    {
+      "feature": "GrLivArea",
+      "importance": 0.05973456309470091
+    },
+    {
+      "feature": "OverallQual",
+      "importance": 0.045664186663132815
+    },
+    {
+      "feature": "HouseAge",
+      "importance": 0.04257953865862046
+    },
+    {
+      "feature": "TotalBsmtSF",
+      "importance": 0.04079831948733375
+    },
+    {
+      "feature": "GarageArea",
+      "importance": 0.03961888587454146
+    },
+    {
+      "feature": "1stFlrSF",
+      "importance": 0.03804491994299151
+    },
+    {
+      "feature": "YearBuilt",
+      "importance": 0.03217933712168487
+    },
+    {
+      "feature": "LotArea",
+      "importance": 0.02912390003709383
+    },
+    {
+      "feature": "TotalBathrooms",
+      "importance": 0.026936535381802875
+    },
+    {
+      "feature": "OverallScore",
+      "importance": 0.025726567881861322
+    },
+    {
+      "feature": "GarageYrBlt",
+      "importance": 0.025430077300715944
+    },
+    {
+      "feature": "GarageCars",
+      "importance": 0.023633167895378494
+    },
+    {
+      "feature": "YearsSinceRemod",
+      "importance": 0.023046917153351797
+    },
+    {
+      "feature": "2ndFlrSF",
+      "importance": 0.021162275274876255
+    }
+  ]
+}

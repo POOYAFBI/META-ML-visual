@@ -1,0 +1,103 @@
+{
+  "model": "XGBoost (Enhanced)",
+  "dataset": "processed_data_classification_fe.csv",
+  "features": 212,
+  "train_accuracy": 1.0,
+  "train_f1_macro": 1.0,
+  "test_accuracy": 0.8184931506849316,
+  "test_f1_macro": 0.817917805544709,
+  "confusion_matrix": [
+    [
+      84,
+      12,
+      1
+    ],
+    [
+      16,
+      70,
+      13
+    ],
+    [
+      0,
+      11,
+      85
+    ]
+  ],
+  "f1_per_class": [
+    0.8527918781725888,
+    0.7291666666666666,
+    0.8717948717948718
+  ],
+  "precision_per_class": [
+    0.84,
+    0.7526881720430108,
+    0.8585858585858586
+  ],
+  "recall_per_class": [
+    0.865979381443299,
+    0.7070707070707071,
+    0.8854166666666666
+  ],
+  "top_features": [
+    {
+      "feature": "TotalSF_x_OverallQual",
+      "importance": 0.10429991781711578
+    },
+    {
+      "feature": "Neighborhood_BrDale",
+      "importance": 0.04814460873603821
+    },
+    {
+      "feature": "HouseStyle_2Story",
+      "importance": 0.043220408260822296
+    },
+    {
+      "feature": "KitchenAbvGr",
+      "importance": 0.030853940173983574
+    },
+    {
+      "feature": "BldgType_Duplex",
+      "importance": 0.030422568321228027
+    },
+    {
+      "feature": "GarageType_Detchd",
+      "importance": 0.027146318927407265
+    },
+    {
+      "feature": "Neighborhood_Gilbert",
+      "importance": 0.021250532940030098
+    },
+    {
+      "feature": "YearBuilt",
+      "importance": 0.020522845908999443
+    },
+    {
+      "feature": "Neighborhood_Veenker",
+      "importance": 0.0195778738707304
+    },
+    {
+      "feature": "Neighborhood_BrkSide",
+      "importance": 0.017169002443552017
+    },
+    {
+      "feature": "ScreenPorch",
+      "importance": 0.016881372779607773
+    },
+    {
+      "feature": "Neighborhood_Crawfor",
+      "importance": 0.015908662229776382
+    },
+    {
+      "feature": "Neighborhood_CollgCr",
+      "importance": 0.015634609386324883
+    },
+    {
+      "feature": "Exterior2nd_CmentBd",
+      "importance": 0.014238753356039524
+    },
+    {
+      "feature": "BsmtQual_encoded",
+      "importance": 0.01396747212857008
+    }
+  ]
+}

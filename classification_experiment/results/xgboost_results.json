@@ -1,0 +1,91 @@
+{
+  "model": "XGBoost",
+  "train_accuracy": 1.0,
+  "train_f1_macro": 1.0,
+  "test_accuracy": 0.8321917808219178,
+  "test_f1_macro": 0.8315085791652562,
+  "confusion_matrix": [
+    [
+      83,
+      13,
+      1
+    ],
+    [
+      13,
+      72,
+      11
+    ],
+    [
+      0,
+      11,
+      88
+    ]
+  ],
+  "f1_per_class": [
+    0.8601036269430051,
+    0.75,
+    0.8844221105527639
+  ],
+  "top_features": [
+    {
+      "feature": "TotalSF",
+      "importance": 0.09862745553255081
+    },
+    {
+      "feature": "KitchenQual_encoded",
+      "importance": 0.03821356222033501
+    },
+    {
+      "feature": "OverallQual",
+      "importance": 0.03397485986351967
+    },
+    {
+      "feature": "YearBuilt",
+      "importance": 0.03142720088362694
+    },
+    {
+      "feature": "GarageCars",
+      "importance": 0.030681639909744263
+    },
+    {
+      "feature": "BldgType_Duplex",
+      "importance": 0.024542205035686493
+    },
+    {
+      "feature": "ExterQual_encoded",
+      "importance": 0.02318970300257206
+    },
+    {
+      "feature": "Exterior2nd_VinylSd",
+      "importance": 0.021716589108109474
+    },
+    {
+      "feature": "HouseStyle_SLvl",
+      "importance": 0.019856631755828857
+    },
+    {
+      "feature": "TotalBathrooms",
+      "importance": 0.019744083285331726
+    },
+    {
+      "feature": "LotConfig_CulDSac",
+      "importance": 0.01714116707444191
+    },
+    {
+      "feature": "Fireplaces",
+      "importance": 0.017069604247808456
+    },
+    {
+      "feature": "Neighborhood_Gilbert",
+      "importance": 0.016032734885811806
+    },
+    {
+      "feature": "OverallScore",
+      "importance": 0.015588312409818172
+    },
+    {
+      "feature": "Neighborhood_BrDale",
+      "importance": 0.014705310575664043
+    }
+  ]
+}

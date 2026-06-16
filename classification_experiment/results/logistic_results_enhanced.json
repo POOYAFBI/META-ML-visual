@@ -1,0 +1,41 @@
+{
+  "model": "Logistic Regression (Enhanced)",
+  "dataset": "processed_data_classification_fe.csv",
+  "features": 212,
+  "train_accuracy": 0.9596219931271478,
+  "train_f1_macro": 0.9596840335714448,
+  "test_accuracy": 0.821917808219178,
+  "test_f1_macro": 0.8238046095631235,
+  "confusion_matrix": [
+    [
+      81,
+      16,
+      0
+    ],
+    [
+      12,
+      76,
+      11
+    ],
+    [
+      0,
+      13,
+      83
+    ]
+  ],
+  "f1_per_class": [
+    0.8526315789473684,
+    0.7450980392156863,
+    0.8736842105263158
+  ],
+  "precision_per_class": [
+    0.8709677419354839,
+    0.7238095238095238,
+    0.8829787234042553
+  ],
+  "recall_per_class": [
+    0.8350515463917526,
+    0.7676767676767676,
+    0.8645833333333334
+  ]
+}

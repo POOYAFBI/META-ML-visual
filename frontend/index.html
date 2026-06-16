@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>سامانه پیش‌بینی ML</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<main>
+  <header>
+    <h1>سامانه فارسی پیش‌بینی قیمت مسکن</h1>
+    <p>مدل‌ها، پریست‌ها و نمونه‌های واقعی دیتاست به صورت پویا بارگذاری می‌شوند.</p>
+  </header>
+
+  <section class="card controls">
+    <label>نوع مسئله<select id="task"><option value="regression">رگرسیون</option><option value="classification">طبقه‌بندی</option></select></label>
+    <label>دیتاست<select id="dataset"></select></label>
+    <label>مدل<select id="model"></select></label>
+    <label>حالت ورودی<select id="inputMode"><option value="preset">پریست آماده</option><option value="dataset">نمونه دیتاست</option><option value="advanced">پیشرفته</option></select></label>
+    <button id="load">بارگذاری</button>
+  </section>
+
+  <section class="grid">
+    <section class="card">
+      <h2>ورودی پیش‌بینی</h2>
+      <p id="featureCount"></p>
+      <div id="presetPanel" class="mode-panel"><label>پروفایل ملک<select id="preset"></select></label><p id="presetHelp"></p></div>
+      <div id="samplePanel" class="mode-panel"><label>ردیف واقعی دیتاست<select id="sample"></select></label><p id="sampleHelp"></p></div>
+      <div id="advancedPanel" class="mode-panel"><div id="form" class="form"></div></div>
+      <button id="predict">پیش‌بینی</button>
+      <div id="loading" class="loading" hidden>در حال محاسبه پیش‌بینی...</div>
+      <div id="resultCard" class="result-card empty-state">نتیجه پیش‌بینی اینجا نمایش داده می‌شود.</div>
+      <details id="technicalDetails" class="technical-details" hidden>
+        <summary>نمایش جزئیات فنی</summary>
+        <pre id="result"></pre>
+      </details>
+    </section>
+    <section class="card">
+      <h2>معیارهای واقعی</h2>
+      <div id="metrics"></div>
+    </section>
+  </section>
+
+  <section class="card learning-shell">
+    <div class="chart-heading">
+      <div>
+        <h2>کاوش تعاملی مدل</h2>
+        <p id="taskLesson" class="muted"></p>
+      </div>
+      <div class="lesson-pills"><span>نقطه‌ها را کلیک کنید</span><span>بازه خطا را باز کنید</span><span>ویژگی‌ها را بررسی کنید</span></div>
+    </div>
+    <div class="charts">
+      <article class="chart-card"><h3>کاوشگر پیش‌بینی</h3><p class="chart-help" id="scatterHelp"></p><canvas id="scatter" class="scatter-canvas"></canvas><div id="pointPanel" class="insight-panel">برای دیدن جزئیات، یک نقطه را انتخاب کنید.</div></article>
+      <article class="chart-card"><h3>کاوشگر خطا</h3><p class="chart-help">هر ستون یک بازه از خطاهاست؛ ستون را کلیک کنید تا نمونه‌های داخل آن را ببینید.</p><canvas id="errors"></canvas><div id="binPanel" class="insight-panel">یک ستون خطا را انتخاب کنید.</div></article>
+      <article class="chart-card"><h3>لایه فهم ویژگی‌ها</h3><p class="chart-help">هر میله یک اهمیت کلی مدل است، نه دلیل قطعی یک پیش‌بینی خاص.</p><canvas id="importance"></canvas><div id="featurePanel" class="insight-panel">یک ویژگی را انتخاب کنید.</div></article>
+    </div>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

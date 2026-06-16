@@ -1,0 +1,103 @@
+{
+  "model": "Random Forest (Enhanced)",
+  "dataset": "processed_data_classification_fe.csv",
+  "features": 212,
+  "train_accuracy": 1.0,
+  "train_f1_macro": 1.0,
+  "test_accuracy": 0.8253424657534246,
+  "test_f1_macro": 0.8253898521295429,
+  "confusion_matrix": [
+    [
+      84,
+      12,
+      1
+    ],
+    [
+      17,
+      72,
+      10
+    ],
+    [
+      0,
+      11,
+      85
+    ]
+  ],
+  "f1_per_class": [
+    0.8484848484848485,
+    0.7422680412371134,
+    0.8854166666666666
+  ],
+  "precision_per_class": [
+    0.8316831683168316,
+    0.7578947368421053,
+    0.8854166666666666
+  ],
+  "recall_per_class": [
+    0.865979381443299,
+    0.7272727272727273,
+    0.8854166666666666
+  ],
+  "top_features": [
+    {
+      "feature": "TotalSF_x_OverallQual",
+      "importance": 0.09530394738844238
+    },
+    {
+      "feature": "TotalSF",
+      "importance": 0.07335018525868521
+    },
+    {
+      "feature": "TotalSF_log",
+      "importance": 0.06171794297009379
+    },
+    {
+      "feature": "GrLivArea",
+      "importance": 0.051299472933269266
+    },
+    {
+      "feature": "YearBuilt",
+      "importance": 0.035946305812344266
+    },
+    {
+      "feature": "OverallQual",
+      "importance": 0.03484537541517881
+    },
+    {
+      "feature": "HouseAge",
+      "importance": 0.03246079949549964
+    },
+    {
+      "feature": "GarageArea",
+      "importance": 0.029568122464316143
+    },
+    {
+      "feature": "TotalBathrooms",
+      "importance": 0.02717189410990762
+    },
+    {
+      "feature": "TotalBsmtSF",
+      "importance": 0.026427847151353247
+    },
+    {
+      "feature": "GarageYrBlt",
+      "importance": 0.021290557307757554
+    },
+    {
+      "feature": "GarageCars",
+      "importance": 0.019717076793340532
+    },
+    {
+      "feature": "LotFrontage",
+      "importance": 0.019457359802347623
+    },
+    {
+      "feature": "LotArea_log",
+      "importance": 0.019385201496742756
+    },
+    {
+      "feature": "1stFlrSF",
+      "importance": 0.019168868477673504
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+NEW FEATURES ADDED FOR CLASSIFICATION
+==================================================
+
+1. TotalSF_x_OverallQual
+2. TotalSF_log
+3. LotArea_log
+
+Total new features: 3
+Total features in dataset: 214
