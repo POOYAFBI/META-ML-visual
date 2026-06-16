@@ -39,12 +39,12 @@ DATA_PATHS = {
 
 DISPLAY_DATASETS = {
     "regression": [
-        {"id": "A", "name": "Dataset A - baseline", "dataset_type": "baseline_dataset"},
-        {"id": "B", "name": "Dataset B - minimal feature engineering", "dataset_type": "enhanced_dataset"},
+        {"id": "A", "name": "دیتاست A — پایه (Dataset A / baseline_dataset)", "dataset_type": "baseline_dataset", "raw": "baseline_dataset", "labelFa": "دیتاست A — پایه", "labelEn": "Dataset A / baseline_dataset", "short": "A"},
+        {"id": "B", "name": "دیتاست B — ویژگی‌سازی حداقلی (Dataset B / enhanced_dataset)", "dataset_type": "enhanced_dataset", "raw": "enhanced_dataset", "labelFa": "دیتاست B — ویژگی‌سازی حداقلی", "labelEn": "Dataset B / enhanced_dataset", "short": "B"},
     ],
     "classification": [
-        {"id": "A", "name": "Dataset A - baseline", "dataset_type": "baseline_dataset"},
-        {"id": "C", "name": "Dataset C - classification feature engineering", "dataset_type": "enhanced_dataset"},
+        {"id": "A", "name": "دیتاست A — پایه (Dataset A / baseline_dataset)", "dataset_type": "baseline_dataset", "raw": "baseline_dataset", "labelFa": "دیتاست A — پایه", "labelEn": "Dataset A / baseline_dataset", "short": "A"},
+        {"id": "C", "name": "دیتاست C — ویژگی‌سازی طبقه‌بندی (Dataset C / enhanced_dataset)", "dataset_type": "enhanced_dataset", "raw": "enhanced_dataset", "labelFa": "دیتاست C — ویژگی‌سازی طبقه‌بندی", "labelEn": "Dataset C / enhanced_dataset", "short": "C"},
     ],
 }
 

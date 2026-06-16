@@ -1,8 +1,26 @@
 const $ = id => document.getElementById(id);
 let charts = {}, currentFeatures = [], currentPresets = [], currentSamples = [], vizState = null, lastPrediction = null;
-const faModel = {linear_regression:'Linear / Logistic', logistic_regression:'Logistic', random_forest:'RandomForest', xgboost:'XGBoost'};
+const modelDisplay = {
+  linear_regression: {labelFa: 'رگرسیون خطی', labelEn: 'Linear Regression', raw: 'linear_regression', short: 'Linear'},
+  logistic_regression: {labelFa: 'رگرسیون لجستیک', labelEn: 'Logistic Regression', raw: 'logistic_regression', short: 'Logistic'},
+  random_forest: {labelFa: 'جنگل تصادفی', labelEn: 'Random Forest', raw: 'random_forest', short: 'RF'},
+  xgboost: {labelFa: 'ایکس‌جی‌بوست', labelEn: 'XGBoost', raw: 'xgboost', short: 'XGBoost'}
+};
+const faModel = modelDisplay;
+const datasetDisplay = {
+  baseline_dataset: {labelFa: 'دیتاست پایه', labelEn: 'baseline_dataset', raw: 'baseline_dataset', short: 'Baseline'},
+  enhanced_dataset: {labelFa: 'دیتاست ویژگی‌سازی‌شده', labelEn: 'enhanced_dataset', raw: 'enhanced_dataset', short: 'Enhanced'},
+  A: {labelFa: 'دیتاست A — پایه', labelEn: 'Dataset A / baseline_dataset', raw: 'A', short: 'A'},
+  B: {labelFa: 'دیتاست B — ویژگی‌سازی حداقلی', labelEn: 'Dataset B / enhanced_dataset', raw: 'B', short: 'B'},
+  C: {labelFa: 'دیتاست C — ویژگی‌سازی طبقه‌بندی', labelEn: 'Dataset C / enhanced_dataset', raw: 'C', short: 'C'}
+};
+const featureDisplay = {
+  OverallQual: {labelFa: 'کیفیت کلی ساختمان', labelEn: 'OverallQual', raw: 'OverallQual', short: 'OverallQual'},
+  GrLivArea: {labelFa: 'زیربنای قابل سکونت', labelEn: 'GrLivArea', raw: 'GrLivArea', short: 'GrLivArea'},
+  Neighborhood: {labelFa: 'محله', labelEn: 'Neighborhood', raw: 'Neighborhood', short: 'Neighborhood'}
+};
 const faTask = {regression:'رگرسیون', classification:'طبقه‌بندی'};
-const faDataset = {baseline_dataset:'دیتاست پایه', enhanced_dataset:'دیتاست مهندسی‌شده'};
+const faDataset = Object.fromEntries(Object.entries(datasetDisplay).map(([k, v]) => [k, `${v.labelFa} (${v.labelEn})`]));
 const reliabilityFa = {high:'بالا', medium:'متوسط', low:'پایین'};
 const severityFa = {low:'کم', medium:'متوسط', high:'زیاد'};
 
@@ -17,6 +35,23 @@ function formatSigned(value){ const n = Number(value); return `${n > 0 ? '+' : '
 function formatMoney(value){ return `$${Number(value).toLocaleString('en-US', {maximumFractionDigits: 0})}`; }
 function valueText(value){ return isRegression() ? formatMoney(value) : `کلاس ${formatNumber(value)}`; }
 function percent(value){ return `${Math.round(Number(value || 0) * 100).toLocaleString('fa-IR')}٪`; }
+
+function formatDisplayMeta(meta, fallback){
+  if(!meta) return fallback || '-';
+  const fa = meta.labelFa || fallback || meta.raw || '-';
+  const en = meta.labelEn || meta.raw || fallback || '-';
+  return `${fa} (${en})`;
+}
+function modelLabel(model){ return formatDisplayMeta(modelDisplay[model], model); }
+function datasetLabel(dataset, datasetType){ return formatDisplayMeta(datasetDisplay[dataset] || datasetDisplay[datasetType], dataset || datasetType); }
+function humanizeFeatureName(feature){
+  const raw = String(feature || '');
+  if(featureDisplay[raw]) return formatDisplayMeta(featureDisplay[raw], raw);
+  const neighborhood = raw.match(/^Neighborhood_(.+)$/);
+  if(neighborhood) return `محله: ${neighborhood[1]} (${raw})`;
+  const cleaned = raw.replace(/_/g, ' ');
+  return `${cleaned} (${raw})`;
+}
 function escapeHtml(value){ return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function direction(error){ if(Number(error) > 0) return 'بیش‌برآورد'; if(Number(error) < 0) return 'کم‌برآورد'; return 'دقیق'; }
 function severity(error, maxAbs){ const ratio = maxAbs ? Math.abs(error) / maxAbs : 0; if(ratio >= .66) return 'high'; if(ratio >= .33) return 'medium'; return 'low'; }
@@ -29,7 +64,7 @@ async function loadOptions(){
   function fill(){
     const task = $('task').value, cfg = data.tasks[task];
     $('dataset').innerHTML = cfg.datasets.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
-    $('model').innerHTML = cfg.models.map(m=>`<option value="${m}">${faModel[m]||m}</option>`).join('');
+    $('model').innerHTML = cfg.models.map(m=>`<option value="${m}">${modelLabel(m)}</option>`).join('');
   }
   $('task').onchange = () => { fill(); loadAll(); };
   $('dataset').onchange = loadAll; $('model').onchange = loadAll; $('inputMode').onchange = switchMode;
@@ -46,7 +81,7 @@ function switchMode(){
 async function loadAll(){
   const schema = await api('/api/features?'+params()); currentFeatures = schema.features;
   $('featureCount').textContent = `${currentFeatures.length} ویژگی کامل برای مدل انتخاب‌شده آماده می‌شود`;
-  $('form').innerHTML = currentFeatures.map(f=>`<label>${escapeHtml(f.name)}<input name="${escapeHtml(f.name)}" type="number" step="any" value="0"></label>`).join('');
+  $('form').innerHTML = currentFeatures.map(f=>`<label>${escapeHtml(humanizeFeatureName(f.name))}<input name="${escapeHtml(f.name)}" type="number" step="any" value="0"></label>`).join('');
 
   currentPresets = (await api(`/api/presets?task=${$('task').value}&dataset=${$('dataset').value}`)).presets;
   $('preset').innerHTML = currentPresets.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.label)}</option>`).join('');
@@ -165,8 +200,8 @@ function drawImportance(){
   const items = vizState.raw.feature_importance || [];
   charts.importance = new Chart($('importance'), {
     type:'bar',
-    data:{labels:items.map(x=>x.feature), datasets:[{label:'اهمیت ویژگی', data:items.map(x=>x.importance), backgroundColor:(c)=>c.dataIndex===vizState.selectedFeature?'#7c3aed':'#14b8a6'}]},
-    options:{indexAxis:'y', plugins:{tooltip:{callbacks:{label:c=>`اهمیت: ${formatNumber(c.raw)} — برای توضیح کلیک کنید`}}}, onClick:(evt)=>{ const hit=charts.importance.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectFeature(hit.index); }}
+    data:{labels:items.map(x=>humanizeFeatureName(x.feature)), datasets:[{label:'اهمیت ویژگی', data:items.map(x=>x.importance), backgroundColor:(c)=>c.dataIndex===vizState.selectedFeature?'#7c3aed':'#14b8a6'}]},
+    options:{indexAxis:'y', plugins:{tooltip:{callbacks:{title:items=>items.length ? humanizeFeatureName(vizState.raw.feature_importance[items[0].dataIndex].feature) : '', label:c=>`اهمیت: ${formatNumber(c.raw)} — نام فنی: ${vizState.raw.feature_importance[c.dataIndex].feature}`}}}, onClick:(evt)=>{ const hit=charts.importance.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectFeature(hit.index); }}
   });
 }
 function selectFeature(index){
@@ -174,9 +209,9 @@ function selectFeature(index){
   const f = vizState.raw.feature_importance[index];
   const model = $('model').value;
   const modelText = model.includes('linear') || model.includes('logistic') ? 'در مدل خطی/لجستیک، این عدد از اندازه ضریب می‌آید.' : 'در مدل درختی، این عدد نشان می‌دهد ویژگی چقدر در تقسیم‌ها و تصمیم‌های مدل استفاده شده است.';
-  setPanel('featurePanel', `<b>${escapeHtml(f.feature)}</b><div class="fact-grid"><span>رتبه</span><strong>${formatNumber(index+1)}</strong><span>اهمیت</span><strong>${formatNumber(f.importance)}</strong></div><p>${modelText}</p><p class="warn">هشدار آموزشی: اهمیت کلی ویژگی به معنی علت قطعی یا توضیح یک پیش‌بینی خاص نیست.</p>`);
+  setPanel('featurePanel', `<b>${escapeHtml(humanizeFeatureName(f.feature))}</b><div class="fact-grid"><span>نام فنی</span><strong>${escapeHtml(f.feature)}</strong><span>رتبه</span><strong>${formatNumber(index+1)}</strong><span>اهمیت</span><strong>${formatNumber(f.importance)}</strong></div><p>${modelText}</p><p class="warn">هشدار آموزشی: اهمیت کلی ویژگی به معنی علت قطعی یا توضیح یک پیش‌بینی خاص نیست.</p>`);
   const context = $('featureContext');
-  if(context) context.textContent = `ویژگی انتخاب‌شده: ${f.feature}. این یک نشانه کلی از رفتار مدل است، نه دلیل قطعی همین پیش‌بینی.`;
+  if(context) context.textContent = `ویژگی انتخاب‌شده: ${humanizeFeatureName(f.feature)} | نام فنی: ${f.feature}. این یک نشانه کلی از رفتار مدل است، نه دلیل قطعی همین پیش‌بینی.`;
   charts.importance.update();
 }
 
@@ -210,7 +245,7 @@ function renderResult(data){
     <div class="prediction-value">${mainValue}</div>
     ${range ? `<div class="range-line" title="این بازه از خطای RMSE ساخته شده و یعنی خروجی عددی دقیق و قطعی نیست.">بازه پیش‌بینی: ${range}</div>` : ''}
     <div class="confidence-block explainer" title="${escapeHtml(confidenceTip)}"><div><b>اعتماد مدل</b><span>${percent(confidence)}</span></div><div class="progress"><i style="width:${Math.max(0, Math.min(100, confidence * 100))}%"></i></div><small>${escapeHtml(confidenceTip)}</small></div>
-    <div class="info-panel"><div><small>مدل</small><b>${escapeHtml(faModel[meta.model_name] || meta.model_name || '-')}</b></div><div><small>دیتاست</small><b>${escapeHtml(faDataset[meta.dataset_used] || meta.dataset_used || '-')}</b></div><div><small>نوع مسئله</small><b>${escapeHtml(faTask[meta.task_type] || meta.task_type || '-')}</b></div></div>
+    <div class="info-panel"><div><small>مدل</small><b>${escapeHtml(modelLabel(meta.model_name || '-'))}</b></div><div><small>دیتاست</small><b>${escapeHtml(datasetLabel(meta.dataset_used || '-', meta.dataset_type))}</b></div><div><small>نوع مسئله</small><b>${escapeHtml(faTask[meta.task_type] || meta.task_type || '-')}</b></div></div>
     <div class="analysis"><b>تحلیل</b><p>${escapeHtml(data.analysis?.explanation || '')}</p><p id="featureContext" class="muted">با انتخاب یک ویژگی از نمودار اهمیت، ارتباط کلی آن با رفتار مدل اینجا نمایش داده می‌شود.</p></div>
     ${probs ? `<div class="probabilities"><b>احتمال کلاس‌ها</b>${probs}</div>` : ''}`;
 }
