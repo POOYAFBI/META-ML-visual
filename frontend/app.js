@@ -24,8 +24,6 @@ const faTask = {regression:'رگرسیون', classification:'طبقه‌بندی
 const faDataset = Object.fromEntries(Object.entries(datasetDisplay).map(([k, v]) => [k, `${v.labelFa} (${v.labelEn})`]));
 const reliabilityFa = {high:'بالا', medium:'متوسط', low:'پایین'};
 const severityFa = {low:'کم', medium:'متوسط', high:'زیاد'};
-const uiPalette = {class0:'#2563eb', class1:'#14b8a6', class2:'#7c3aed', correct:'#16a34a', incorrect:'#f97316', selected:'#7c3aed', neutral:'#64748b'};
-const explorerSectionTargets = {errors:'predictionBehaviorCard', confidence:'confidenceCard', features:'featureImportanceCard', boundary:'decisionBoundaryCard'};
 
 async function api(path, options){ const r = await fetch(path, options); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 function params(){ return `task=${$('task').value}&dataset=${$('dataset').value}&model=${$('model').value}`; }
@@ -64,7 +62,7 @@ function humanizeFeatureName(feature){
 function escapeHtml(value){ return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function direction(error){ if(Number(error) > 0) return 'بیش‌برآورد'; if(Number(error) < 0) return 'کم‌برآورد'; return 'دقیق'; }
 function severity(error, maxAbs){ const ratio = maxAbs ? Math.abs(error) / maxAbs : 0; if(ratio >= .66) return 'high'; if(ratio >= .33) return 'medium'; return 'low'; }
-function pointColor(level, selected){ if(selected) return uiPalette.selected; return {low:'#22c55e', medium:'#f97316', high:'#ef4444'}[level] || '#22c55e'; }
+function pointColor(level, selected){ if(selected) return '#7c3aed'; return {low:'#22c55e', medium:'#f97316', high:'#ef4444'}[level] || '#22c55e'; }
 function pointBorderColor(level, selected){ return selected ? '#4c1d95' : 'rgba(15, 23, 42, 0.18)'; }
 function classOutcome(p){ return p.is_correct ?? Number(p.actual) === Number(p.predicted); }
 function setPanel(id, html){ $(id).innerHTML = html; }
@@ -167,10 +165,8 @@ function explainMetric(metric, value){
 }
 
 async function drawCharts(){
-  $('visualizationLoading').hidden = false;
-  try{
-    const v = await api('/api/visualization?'+params());
-    destroy('scatter'); destroy('errors'); destroy('importance'); destroy('classwisePerformance'); destroy('confidenceDistribution'); destroy('simplex'); destroy('decisionBoundary');
+  const v = await api('/api/visualization?'+params());
+  destroy('scatter'); destroy('errors'); destroy('importance'); destroy('classwisePerformance'); destroy('confidenceDistribution'); destroy('simplex'); destroy('decisionBoundary');
   const maxAbsError = Math.max(...v.errors.map(e=>Math.abs(Number(e))), 1);
   const points = isRegression()
     ? v.actual.map((a,i)=>({x:a,y:v.predicted[i], actual:a, predicted:v.predicted[i], error:v.errors[i], index:i, severity:severity(v.errors[i], maxAbsError)})).slice(0,400)
@@ -183,61 +179,7 @@ async function drawCharts(){
   $('errorHelp').textContent = isRegression() ? v.error_definition ? `تعریف خطا: ${v.error_definition}؛ واحد: ${v.error_unit || 'نامشخص'}.` : 'عدد منفی یعنی کم‌برآورد؛ عدد مثبت یعنی بیش‌برآورد.' : 'این نمودار به جای خطای عددی، تعداد پاسخ‌های درست و غلط طبقه‌بندی را نشان می‌دهد.';
   $('scatterHelp').textContent = isRegression() ? v.ideal_line_description || 'هر نقطه یک خانه است. هرچه به خط ایده‌آل نزدیک‌تر باشد، پیش‌بینی دقیق‌تر است.' : 'خانه‌های روی قطر اصلی پیش‌بینی درست هستند؛ خانه‌های بیرون قطر نشان می‌دهند مدل کدام کلاس‌ها را با هم اشتباه گرفته است.';
   resetPanels();
-  updateExplorerShell(v);
   drawScatter(); drawErrors(); drawImportance(); drawClassificationLayer();
-  applyExplorerVisibility();
-  }finally{
-    $('visualizationLoading').hidden = true;
-  }
-}
-
-
-function primaryMetricFromVisualization(v){
-  if(isRegression()){
-    if(v.metrics?.rmse !== undefined) return `RMSE ${formatMoney(v.metrics.rmse)}`;
-    const mae = v.errors?.length ? v.errors.reduce((sum,e)=>sum+Math.abs(Number(e)),0)/v.errors.length : 0;
-    return `میانگین خطا ${formatMoney(mae)}`;
-  }
-  const ok = v.is_correct || [];
-  const acc = ok.length ? ok.filter(Boolean).length / ok.length : null;
-  return acc === null ? 'Accuracy —' : `Accuracy ${percent(acc)}`;
-}
-function shortInsight(v){
-  if(isRegression()){
-    const avg = v.errors?.length ? v.errors.reduce((sum,e)=>sum+Math.abs(Number(e)),0)/v.errors.length : 0;
-    return `میانگین قدر مطلق خطا حدود ${formatMoney(avg)} است؛ نقاط دورتر از خط ایده‌آل را بررسی کنید.`;
-  }
-  const mistakes = (v.is_correct || []).filter(x=>!x).length;
-  return mistakes ? `${formatNumber(mistakes)} خطای طبقه‌بندی دیده می‌شود؛ ماتریس خطا و اشتباه‌های پر اطمینان را اولویت دهید.` : 'در نمونه‌های نمایشی خطایی دیده نمی‌شود؛ اطمینان و مرز تصمیم را بررسی کنید.';
-}
-function updateExplorerShell(v){
-  $('taskLesson').textContent = 'این بخش نشان می‌دهد مدل انتخاب‌شده چطور تصمیم می‌گیرد، کجا خطا می‌کند و به کدام ویژگی‌ها حساس‌تر است.';
-  const items = [
-    ['نوع مسئله', faTask[$('task').value] || $('task').value],
-    ['دیتاست', datasetLabel($('dataset').value)],
-    ['مدل', modelLabel($('model').value)],
-    ['معیار اصلی', primaryMetricFromVisualization(v)],
-    ['برداشت کوتاه', shortInsight(v)]
-  ];
-  $('explorerSummary').innerHTML = items.map(([k,val])=>`<article><span>${escapeHtml(k)}</span><strong>${escapeHtml(val)}</strong></article>`).join('');
-  document.querySelectorAll('[data-card-badge]').forEach(el=>{ el.textContent = `${faTask[$('task').value]} · ${(modelDisplay[$('model').value]?.short || $('model').value)}`; });
-}
-function applyExplorerVisibility(){
-  document.querySelectorAll('.explorer-card').forEach(card=>{
-    const mode = card.dataset.taskMode;
-    card.hidden = mode !== 'both' && ((mode === 'regression') !== isRegression());
-  });
-  document.querySelectorAll('.explorer-nav button').forEach(btn=>{
-    const id = explorerSectionTargets[btn.dataset.explorerSection];
-    const target = id ? $(id) : null;
-    btn.disabled = !target || target.hidden;
-    btn.setAttribute('aria-disabled', String(btn.disabled));
-  });
-}
-function setupExplorerNav(){
-  document.querySelectorAll('.explorer-nav button').forEach(btn=>{
-    btn.onclick = ()=>{ const target = $(explorerSectionTargets[btn.dataset.explorerSection]); if(target && !target.hidden) target.scrollIntoView({behavior:'smooth', block:'start'}); };
-  });
 }
 
 function scatterBounds(points){
@@ -360,11 +302,11 @@ function selectPoint(index){
 function drawErrors(){
   charts.errors = new Chart($('errors'), {
     type:'bar',
-    data:{labels:vizState.bins.labels, datasets:[{label:isRegression()?'توزیع خطا':'درست/غلط', data:vizState.bins.counts, backgroundColor:(c)=>isRegression()?binColor(c.dataIndex):[uiPalette.correct,uiPalette.incorrect][c.dataIndex], borderColor:(c)=>c.dataIndex===vizState.selectedBin?'#7c3aed':'transparent', borderWidth:2}]},
+    data:{labels:vizState.bins.labels, datasets:[{label:isRegression()?'توزیع خطا':'درست/غلط', data:vizState.bins.counts, backgroundColor:(c)=>isRegression()?binColor(c.dataIndex):['#22c55e','#ef4444'][c.dataIndex], borderColor:(c)=>c.dataIndex===vizState.selectedBin?'#7c3aed':'transparent', borderWidth:2}]},
     options:{maintainAspectRatio:false, plugins:{tooltip:{callbacks:{label:c=>`${formatNumber(c.raw)} پیش‌بینی در ${vizState.bins.labels[c.dataIndex]}`}}}, onClick:(evt)=>{ const hit=charts.errors.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectBin(hit.index, true); }, scales:{x:{title:{display:true,text:isRegression()?'اختلاف پیش‌بینی با واقعیت (Predicted - Actual)':'نتیجه طبقه‌بندی'}}, y:{title:{display:true,text:'تعداد'}}}}
   });
 }
-function binColor(i){ if(i===vizState.selectedBin) return '#7c3aed'; const mid=vizState.bins.centers[i]; if(Math.abs(mid) < vizState.bins.step) return uiPalette.correct; return mid < 0 ? '#38bdf8' : uiPalette.incorrect; }
+function binColor(i){ if(i===vizState.selectedBin) return '#7c3aed'; const mid=vizState.bins.centers[i]; if(Math.abs(mid) < vizState.bins.step) return '#22c55e'; return mid < 0 ? '#38bdf8' : '#f97316'; }
 function selectBin(index, renderScatterLink){
   vizState.selectedBin = index;
   const examples = vizState.bins.members[index].slice(0,6).map(i=>({i, actual:vizState.raw.actual_class?.[i] ?? vizState.raw.actual[i], predicted:vizState.raw.predicted_class?.[i] ?? vizState.raw.predicted[i], error:vizState.raw.errors[i]}));
@@ -397,7 +339,7 @@ function selectFeature(index){
 }
 
 
-const classPalette = [uiPalette.class0, uiPalette.class1, uiPalette.class2, '#f59e0b', '#ec4899', '#0ea5e9'];
+const classPalette = ['#2563eb', '#14b8a6', '#7c3aed', '#f59e0b', '#ec4899', '#0ea5e9'];
 function classColor(classId, order=[]){
   const index = order.map(String).indexOf(String(classId));
   return classPalette[(index >= 0 ? index : Math.abs(String(classId).split('').reduce((sum,ch)=>sum+ch.charCodeAt(0),0))) % classPalette.length];
@@ -473,6 +415,8 @@ function weakestMetric(item){
   return metrics.sort((a,b)=>a.value-b.value)[0];
 }
 function drawClassificationLayer(){
+  const layer = $('classificationAnalysisLayer');
+  layer.hidden = isRegression();
   if(isRegression()){
     $('classwiseSummary').innerHTML = ''; $('confidentMistakes').innerHTML = ''; $('simplexFallback').textContent = ''; destroy('decisionBoundary');
     return;
@@ -485,7 +429,6 @@ function drawClassificationLayer(){
   loadDecisionSurface();
 }
 function drawClasswisePerformance(){
-  destroy('classwisePerformance');
   const items = classwiseItems();
   if(!items.length){ setPanel('classwisePanel','داده عملکرد کلاس‌ها در دسترس نیست.'); return; }
   const best = [...items].sort((a,b)=>b.f1-a.f1)[0];
@@ -497,9 +440,9 @@ function drawClasswisePerformance(){
   charts.classwisePerformance = new Chart($('classwisePerformance'), {
     type:'bar',
     data:{labels:items.map(i=>i.label), datasets:[
-      {label:'Precision', data:items.map(i=>i.precision), backgroundColor:items.map(i=>i.id===String(vizState.selectedClass)?uiPalette.selected:(i.id===weakest.id?'#fb923c':classColor(i.id, items.map(x=>x.id))))},
-      {label:'Recall', data:items.map(i=>i.recall), backgroundColor:items.map(i=>i.id===String(vizState.selectedClass)?uiPalette.selected:(i.id===weakest.id?'#fdba74':classColor(i.id, items.map(x=>x.id))))},
-      {label:'F1', data:items.map(i=>i.f1), backgroundColor:items.map(i=>i.id===String(vizState.selectedClass)?uiPalette.selected:(i.id===weakest.id?'#ef4444':classColor(i.id, items.map(x=>x.id))))}
+      {label:'Precision', data:items.map(i=>i.precision), backgroundColor:items.map(i=>i.id===weakest.id?'#fb923c':'#2563eb')},
+      {label:'Recall', data:items.map(i=>i.recall), backgroundColor:items.map(i=>i.id===weakest.id?'#fdba74':'#14b8a6')},
+      {label:'F1', data:items.map(i=>i.f1), backgroundColor:items.map(i=>i.id===weakest.id?'#ef4444':'#7c3aed')}
     ]},
     options:{maintainAspectRatio:false, plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${percent(c.raw)} | support: ${formatNumber(items[c.dataIndex].support)}`}}}, onClick:(evt)=>{ const hit=charts.classwisePerformance.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectClassPerformance(items[hit.index].id); }, scales:{y:{beginAtZero:true, max:1, ticks:{callback:v=>percent(v)}, title:{display:true,text:'درصد'}}, x:{title:{display:true,text:'کلاس'}}}}
   });
@@ -509,7 +452,6 @@ function selectClassPerformance(classId){
   const item = classwiseItems().find(x=>x.id===String(classId));
   if(!item) return;
   const weak = weakestMetric(item);
-  drawClasswisePerformance();
   setPanel('classwisePanel', `<b>${escapeHtml(item.label)}</b><div class="fact-grid"><span>Precision</span><strong>${percent(item.precision)}</strong><span>Recall</span><strong>${percent(item.recall)}</strong><span>F1</span><strong>${percent(item.f1)}</strong><span>Support</span><strong>${formatNumber(item.support)}</strong></div><p class="warn">ضعیف‌ترین معیار: ${escapeHtml(weak.name)} (${percent(weak.value)}). ${escapeHtml(weak.text)}</p>`);
 }
 function confidenceBins(confidences, isCorrect, binCount = 10){
@@ -523,14 +465,13 @@ function drawConfidenceDistribution(){
   if(!confidences.length){ canvas.hidden = true; fallback.hidden = false; panel.hidden = true; fallback.textContent = 'این مدل احتمال کلاس‌ها را ارائه نمی‌کند، بنابراین نمودار اطمینان در دسترس نیست.'; return; }
   canvas.hidden = false; fallback.hidden = true; panel.hidden = false;
   vizState.confidenceBins = confidenceBins(confidences, vizState.raw.is_correct || []);
-  charts.confidenceDistribution = new Chart(canvas, {type:'bar', data:{labels:vizState.confidenceBins.map(b=>b.label), datasets:[{label:'درست', data:vizState.confidenceBins.map(b=>b.correct), backgroundColor:uiPalette.correct, borderColor:c=>c.dataIndex===vizState.selectedConfidenceBin?uiPalette.selected:'transparent', borderWidth:2},{label:'غلط', data:vizState.confidenceBins.map(b=>b.incorrect), backgroundColor:uiPalette.incorrect, borderColor:c=>c.dataIndex===vizState.selectedConfidenceBin?uiPalette.selected:'transparent', borderWidth:2}]}, options:{maintainAspectRatio:false, plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${formatNumber(c.raw)} نمونه`}}}, onClick:(evt)=>{ const hit=charts.confidenceDistribution.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectConfidenceBin(hit.index); }, scales:{x:{stacked:false,title:{display:true,text:'بازه اطمینان'}}, y:{beginAtZero:true,title:{display:true,text:'تعداد نمونه'}}}}});
+  charts.confidenceDistribution = new Chart(canvas, {type:'bar', data:{labels:vizState.confidenceBins.map(b=>b.label), datasets:[{label:'درست', data:vizState.confidenceBins.map(b=>b.correct), backgroundColor:'#14b8a6'},{label:'غلط', data:vizState.confidenceBins.map(b=>b.incorrect), backgroundColor:'#f97316'}]}, options:{maintainAspectRatio:false, plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${formatNumber(c.raw)} نمونه`}}}, onClick:(evt)=>{ const hit=charts.confidenceDistribution.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectConfidenceBin(hit.index); }, scales:{x:{stacked:false,title:{display:true,text:'بازه اطمینان'}}, y:{beginAtZero:true,title:{display:true,text:'تعداد نمونه'}}}}});
 }
 function selectConfidenceBin(binIndex){
   vizState.selectedConfidenceBin = binIndex;
   const bin = vizState.confidenceBins?.[binIndex]; if(!bin) return;
   const total = bin.correct + bin.incorrect, rate = total ? bin.incorrect / total : 0;
   const examples = bin.members.slice(0,6).map(i=>`<button onclick="selectPointByRawIndex(${i})"><span>#${i}</span><span>${escapeHtml(classLabelFor(vizState.raw.actual_class?.[i] ?? vizState.raw.actual[i]))} → ${escapeHtml(classLabelFor(vizState.raw.predicted_class?.[i] ?? vizState.raw.predicted[i]))}</span><b>${vizState.raw.is_correct?.[i] ? 'درست' : 'غلط'}</b></button>`).join('');
-  charts.confidenceDistribution?.update();
   setPanel('confidencePanel', `<b>بازه اطمینان ${escapeHtml(bin.label)}</b><div class="fact-grid"><span>درست</span><strong>${formatNumber(bin.correct)}</strong><span>غلط</span><strong>${formatNumber(bin.incorrect)}</strong><span>نرخ خطا</span><strong>${percent(rate)}</strong></div><div class="mini-list">${examples || '<p>نمونه‌ای در این بازه نیست.</p>'}</div>`);
 }
 function probabilityBars(probabilities){
@@ -662,7 +603,6 @@ function renderResult(data){
     ${probs ? `<div class="probabilities"><b>احتمال کلاس‌ها</b>${probs}</div>` : ''}`;
 }
 
-setupExplorerNav();
 $('load').onclick = loadAll;
 $('predict').onclick = async()=>{
   const body = {task:$('task').value,dataset:$('dataset').value,model:$('model').value,input_mode:activeMode(),features:{}};
