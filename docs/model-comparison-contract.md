@@ -1,19 +1,19 @@
 # Model Comparison Dashboard Data Contract
 
-This document defines the frontend data contract for the **Model Performance Comparison** dashboard (`مقایسه عملکرد مدل‌ها`). It is intentionally frontend-first: backend implementation should match this shape later, but no backend API is required for this task.
+This document defines the frontend data contract for the **Model Performance Comparison** dashboard (`مقایسه عملکرد مدل‌ها`). It is shared by the frontend and backend: the comparison API must return this shape so the dashboard can consume real evaluation data without UI changes.
 
-The current frontend mock data in `frontend/app.js` uses this exact structure under `comparisonMockData.regression` and `comparisonMockData.classification`.
+The frontend mock data in `frontend/app.js` uses this exact structure under `mockComparisonData.regression` and `mockComparisonData.classification`, and the backend returns the same shape from `/api/comparison`.
 
 ## Endpoint intent
 
-A future backend can expose one response per task, for example:
+The backend exposes one response per task:
 
 ```http
-GET /api/model-comparison?task=regression
-GET /api/model-comparison?task=classification
+GET /api/comparison?task=regression
+GET /api/comparison?task=classification
 ```
 
-The response body should be one JSON object matching the schema below.
+The response body is one JSON object matching the schema below.
 
 ## Top-level JSON shape
 
