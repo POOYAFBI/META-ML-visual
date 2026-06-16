@@ -33,6 +33,7 @@ function isRegression(){ return currentTask() === 'regression'; }
 function formatNumber(value){ return Number(value).toLocaleString('fa-IR', {maximumFractionDigits: 2}); }
 function formatSigned(value){ const n = Number(value); return `${n > 0 ? '+' : ''}${formatNumber(n)}`; }
 function formatMoney(value){ return `$${Number(value).toLocaleString('en-US', {maximumFractionDigits: 0})}`; }
+function formatSignedMoney(value){ const n = Number(value); return `${n > 0 ? '+' : n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', {maximumFractionDigits: 0})}`; }
 function valueText(value){ return isRegression() ? formatMoney(value) : `کلاس ${formatNumber(value)}`; }
 function percent(value){ return `${Math.round(Number(value || 0) * 100).toLocaleString('fa-IR')}٪`; }
 
@@ -55,8 +56,9 @@ function humanizeFeatureName(feature){
 function escapeHtml(value){ return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function direction(error){ if(Number(error) > 0) return 'بیش‌برآورد'; if(Number(error) < 0) return 'کم‌برآورد'; return 'دقیق'; }
 function severity(error, maxAbs){ const ratio = maxAbs ? Math.abs(error) / maxAbs : 0; if(ratio >= .66) return 'high'; if(ratio >= .33) return 'medium'; return 'low'; }
-function pointColor(level, selected){ return selected ? '#7c3aed' : 'rgba(37, 99, 235, 0.42)'; }
-function pointBorderColor(level, selected){ if(selected) return '#4c1d95'; return {low:'rgba(34, 197, 94, 0.55)', medium:'rgba(249, 115, 22, 0.55)', high:'rgba(239, 68, 68, 0.65)'}[level] || 'rgba(37, 99, 235, 0.55)'; }
+function pointColor(level, selected){ if(selected) return '#7c3aed'; return {low:'#22c55e', medium:'#f97316', high:'#ef4444'}[level] || '#22c55e'; }
+function pointBorderColor(level, selected){ return selected ? '#4c1d95' : 'rgba(15, 23, 42, 0.18)'; }
+function classOutcome(p){ return p.is_correct ?? Number(p.actual) === Number(p.predicted); }
 function setPanel(id, html){ $(id).innerHTML = html; }
 
 async function loadOptions(){
@@ -123,11 +125,16 @@ async function drawCharts(){
   const v = await api('/api/visualization?'+params());
   destroy('scatter'); destroy('errors'); destroy('importance');
   const maxAbsError = Math.max(...v.errors.map(e=>Math.abs(Number(e))), 1);
-  const points = v.actual.map((a,i)=>({x:a,y:v.predicted[i], actual:a, predicted:v.predicted[i], error:v.errors[i], index:i, severity:severity(v.errors[i], maxAbsError)})).slice(0,400);
-  const bins = histogram(v.errors, 20);
+  const points = isRegression()
+    ? v.actual.map((a,i)=>({x:a,y:v.predicted[i], actual:a, predicted:v.predicted[i], error:v.errors[i], index:i, severity:severity(v.errors[i], maxAbsError)})).slice(0,400)
+    : v.actual.map((a,i)=>{ const ok = v.is_correct?.[i] ?? Number(a) === Number(v.predicted[i]); return {x:ok ? 'درست' : 'غلط', y:ok ? 1 : 0, actual:v.actual_class?.[i] ?? a, predicted:v.predicted_class?.[i] ?? v.predicted[i], error:v.errors[i], index:i, is_correct:ok, severity:ok ? 'low' : 'high'}; }).slice(0,400);
+  const bins = isRegression() ? histogram(v.errors, 20, formatMoney) : classificationSummary(v);
   vizState = {raw:v, points, bins, maxAbsError, selectedPoint:null, selectedBin:null, selectedFeature:null};
   $('taskLesson').textContent = isRegression() ? 'رگرسیون یعنی فاصله عدد پیش‌بینی‌شده با مقدار واقعی را می‌آموزیم.' : 'طبقه‌بندی یعنی درستی کلاس و احتمال انتخاب‌شده را بررسی می‌کنیم.';
-  $('scatterHelp').textContent = isRegression() ? 'هر نقطه یک پیش‌بینی عددی است؛ فاصله بیشتر یعنی خطای بیشتر.' : 'هر نقطه یک مقایسه کلاس واقعی و کلاس پیش‌بینی‌شده است؛ درست/غلط بودن مهم‌تر از فاصله عددی است.';
+  $('scatterTitle').textContent = isRegression() ? 'قیمت واقعی در برابر قیمت پیش‌بینی‌شده' : 'خلاصه درست/غلط طبقه‌بندی';
+  $('errorTitle').textContent = isRegression() ? 'توزیع خطای پیش‌بینی (Prediction Error Distribution)' : 'تعداد پیش‌بینی‌های درست و غلط';
+  $('errorHelp').textContent = isRegression() ? 'عدد منفی یعنی کم‌برآورد؛ عدد مثبت یعنی بیش‌برآورد.' : 'این نمودار به جای خطای عددی، تعداد پاسخ‌های درست و غلط طبقه‌بندی را نشان می‌دهد.';
+  $('scatterHelp').textContent = isRegression() ? 'هر نقطه یک خانه است. هرچه به خط ایده‌آل نزدیک‌تر باشد، پیش‌بینی دقیق‌تر است.' : 'هر ستون نشان می‌دهد چند خانه در طبقه‌بندی درست یا غلط پیش‌بینی شده‌اند.';
   resetPanels();
   drawScatter(); drawErrors(); drawImportance();
 }
@@ -141,38 +148,43 @@ function scatterBounds(points){
 function referenceLine(bounds){ return [{x:bounds.min, y:bounds.min}, {x:bounds.max, y:bounds.max}]; }
 
 function drawScatter(){
+  if(!isRegression()) return drawClassificationSummary();
   const ctx = $('scatter');
   const bounds = scatterBounds(vizState.points);
   charts.scatter = new Chart(ctx, {
     type:'scatter',
     data:{datasets:[
-      {label:'خط مرجع: پیش‌بینی ایده‌آل', data:referenceLine(bounds), type:'line', borderColor:'rgba(15, 23, 42, 0.35)', borderDash:[6,6], borderWidth:2, pointRadius:0, pointHitRadius:0, fill:false, order:0},
-      {label:isRegression()?'واقعی در برابر پیش‌بینی':'کلاس واقعی در برابر کلاس پیش‌بینی', data:vizState.points, order:1, pointRadius:p=>p.raw.index===vizState.selectedPoint?7:4, pointHoverRadius:7, pointHitRadius:10, backgroundColor:p=>pointColor(p.raw.severity, p.raw.index===vizState.selectedPoint), borderColor:p=>pointBorderColor(p.raw.severity, p.raw.index===vizState.selectedPoint), borderWidth:p=>p.raw.index===vizState.selectedPoint?3:1.25}
+      {label:'خط پیش‌بینی ایده‌آل (Ideal Prediction Line)', data:referenceLine(bounds), type:'line', borderColor:'rgba(15, 23, 42, 0.35)', borderDash:[6,6], borderWidth:2, pointRadius:0, pointHitRadius:0, fill:false, order:0},
+      {label:'خانه‌ها بر اساس سطح خطا', data:vizState.points, order:1, pointRadius:p=>p.raw.index===vizState.selectedPoint?7:4, pointHoverRadius:7, pointHitRadius:10, backgroundColor:p=>pointColor(p.raw.severity, p.raw.index===vizState.selectedPoint), borderColor:p=>pointBorderColor(p.raw.severity, p.raw.index===vizState.selectedPoint), borderWidth:p=>p.raw.index===vizState.selectedPoint?3:1.25}
     ]},
     options:{
-      parsing:false,
-      maintainAspectRatio:true,
-      aspectRatio:1.08,
-      animation:false,
-      interaction:{mode:'nearest', intersect:true},
-      plugins:{legend:{display:true, labels:{filter:item=>item.text !== 'خط مرجع: پیش‌بینی ایده‌آل'}}, tooltip:{filter:item=>item.datasetIndex === 1, callbacks:{label:c=>tooltipForPoint(c.raw)}}},
+      parsing:false, maintainAspectRatio:true, aspectRatio:1.08, animation:false, interaction:{mode:'nearest', intersect:true},
+      plugins:{legend:{display:true}, tooltip:{filter:item=>item.datasetIndex === 1, callbacks:{label:c=>tooltipForPoint(c.raw)}}},
       onClick:(evt)=>{ const hit=charts.scatter.getElementsAtEventForMode(evt,'nearest',{intersect:true},true).find(item=>item.datasetIndex===1); if(hit) selectPoint(hit.index); },
       scales:{
-        x:{min:bounds.min, max:bounds.max, grace:0, title:{display:true,text:isRegression()?'Actual / مقدار واقعی':'کلاس واقعی'}, grid:{color:'rgba(148, 163, 184, 0.22)'}},
-        y:{min:bounds.min, max:bounds.max, grace:0, title:{display:true,text:isRegression()?'Predicted / مقدار پیش‌بینی':'کلاس پیش‌بینی'}, grid:{color:'rgba(148, 163, 184, 0.22)'}}
+        x:{min:bounds.min, max:bounds.max, grace:0, title:{display:true,text:'قیمت واقعی (Actual SalePrice)'}, ticks:{callback:v=>formatMoney(v)}, grid:{color:'rgba(148, 163, 184, 0.22)'}},
+        y:{min:bounds.min, max:bounds.max, grace:0, title:{display:true,text:'قیمت پیش‌بینی‌شده (Predicted SalePrice)'}, ticks:{callback:v=>formatMoney(v)}, grid:{color:'rgba(148, 163, 184, 0.22)'}}
       }
     }
   });
 }
+function drawClassificationSummary(){
+  const counts = [vizState.points.filter(classOutcome).length, vizState.points.filter(p=>!classOutcome(p)).length];
+  charts.scatter = new Chart($('scatter'), {
+    type:'bar',
+    data:{labels:['درست','غلط'], datasets:[{label:'نتیجه طبقه‌بندی', data:counts, backgroundColor:['#22c55e','#ef4444']}]},
+    options:{animation:false, plugins:{tooltip:{callbacks:{label:c=>`${formatNumber(c.raw)} خانه ${c.label} پیش‌بینی شده است`}}}, onClick:(evt)=>{ const hit=charts.scatter.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectBin(hit.index, false); }, scales:{x:{title:{display:true,text:'نتیجه پیش‌بینی'}}, y:{beginAtZero:true,title:{display:true,text:'تعداد خانه‌ها'}}}}
+  });
+}
 function tooltipForPoint(p){
-  if(isRegression()) return `${direction(p.error)} | خطا: ${formatSigned(p.error)} | ${severityFa[p.severity]}`;
-  return Number(p.actual) === Number(p.predicted) ? `درست | کلاس ${formatNumber(p.actual)}` : `غلط | واقعی ${formatNumber(p.actual)}، پیش‌بینی ${formatNumber(p.predicted)}`;
+  if(isRegression()) return [`قیمت واقعی: ${formatMoney(p.actual)}`, `قیمت پیش‌بینی‌شده: ${formatMoney(p.predicted)}`, `خطا: ${formatSignedMoney(p.error)}`, `نوع خطا: ${direction(p.error)}`, `سطح خطا: ${severityFa[p.severity]}`];
+  return classOutcome(p) ? `درست | کلاس ${formatNumber(p.actual)}` : `غلط | واقعی ${formatNumber(p.actual)}، پیش‌بینی ${formatNumber(p.predicted)}`;
 }
 function selectPoint(index){
   const p = vizState.points[index];
   vizState.selectedPoint = p.index;
-  const binIndex = findBin(p.error);
-  setPanel('pointPanel', `<b>${isRegression()?'جزئیات پیش‌بینی':'جزئیات طبقه‌بندی'}</b><div class="fact-grid"><span>واقعی</span><strong>${valueText(p.actual)}</strong><span>پیش‌بینی</span><strong>${valueText(p.predicted)}</strong><span>خطا</span><strong>${formatSigned(p.error)}</strong><span>برداشت</span><strong>${isRegression()?direction(p.error):(Number(p.actual)===Number(p.predicted)?'درست':'غلط')}</strong></div><p>${isRegression()?`این نمونه ${severityFa[p.severity]} خطا دارد و به بازه خطای انتخاب‌شده وصل شد.`:'در طبقه‌بندی، درست بودن کلاس از فاصله عددی مهم‌تر است.'}</p>`);
+  const binIndex = isRegression() ? findBin(p.error) : findClassBin(p);
+  setPanel('pointPanel', `<b>${isRegression()?'جزئیات پیش‌بینی':'جزئیات طبقه‌بندی'}</b><div class="fact-grid"><span>واقعی</span><strong>${valueText(p.actual)}</strong><span>پیش‌بینی</span><strong>${valueText(p.predicted)}</strong><span>خطا</span><strong>${isRegression()?formatSignedMoney(p.error):formatSigned(p.error)}</strong><span>برداشت</span><strong>${isRegression()?direction(p.error):(classOutcome(p)?'درست':'غلط')}</strong></div><p>${isRegression()?`این نمونه ${severityFa[p.severity]} خطا دارد و به بازه خطای انتخاب‌شده وصل شد.`:'در طبقه‌بندی، درست بودن کلاس از فاصله عددی مهم‌تر است.'}</p>`);
   selectBin(binIndex, false);
   charts.scatter.update();
 }
@@ -180,17 +192,18 @@ function selectPoint(index){
 function drawErrors(){
   charts.errors = new Chart($('errors'), {
     type:'bar',
-    data:{labels:vizState.bins.labels, datasets:[{label:'توزیع خطا', data:vizState.bins.counts, backgroundColor:(c)=>binColor(c.dataIndex), borderColor:(c)=>c.dataIndex===vizState.selectedBin?'#7c3aed':'transparent', borderWidth:2}]},
-    options:{plugins:{tooltip:{callbacks:{label:c=>`${c.raw} پیش‌بینی در بازه ${vizState.bins.labels[c.dataIndex]}`}}}, onClick:(evt)=>{ const hit=charts.errors.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectBin(hit.index, true); }, scales:{x:{title:{display:true,text:'بازه خطا'}}, y:{title:{display:true,text:'تعداد'}}}}
+    data:{labels:vizState.bins.labels, datasets:[{label:isRegression()?'توزیع خطا':'درست/غلط', data:vizState.bins.counts, backgroundColor:(c)=>isRegression()?binColor(c.dataIndex):['#22c55e','#ef4444'][c.dataIndex], borderColor:(c)=>c.dataIndex===vizState.selectedBin?'#7c3aed':'transparent', borderWidth:2}]},
+    options:{plugins:{tooltip:{callbacks:{label:c=>`${formatNumber(c.raw)} پیش‌بینی در ${vizState.bins.labels[c.dataIndex]}`}}}, onClick:(evt)=>{ const hit=charts.errors.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectBin(hit.index, true); }, scales:{x:{title:{display:true,text:isRegression()?'اختلاف پیش‌بینی با واقعیت (Predicted - Actual)':'نتیجه طبقه‌بندی'}}, y:{title:{display:true,text:'تعداد'}}}}
   });
 }
 function binColor(i){ if(i===vizState.selectedBin) return '#7c3aed'; const mid=vizState.bins.centers[i]; if(Math.abs(mid) < vizState.bins.step) return '#22c55e'; return mid < 0 ? '#38bdf8' : '#f97316'; }
 function selectBin(index, renderScatterLink){
   vizState.selectedBin = index;
-  const examples = vizState.bins.members[index].slice(0,6).map(i=>({i, actual:vizState.raw.actual[i], predicted:vizState.raw.predicted[i], error:vizState.raw.errors[i]}));
+  const examples = vizState.bins.members[index].slice(0,6).map(i=>({i, actual:vizState.raw.actual_class?.[i] ?? vizState.raw.actual[i], predicted:vizState.raw.predicted_class?.[i] ?? vizState.raw.predicted[i], error:vizState.raw.errors[i]}));
   const center = vizState.bins.centers[index];
-  const label = Math.abs(center) < vizState.bins.step ? 'نزدیک به دقیق' : center < 0 ? 'کم‌برآورد' : 'بیش‌برآورد';
-  setPanel('binPanel', `<b>بازه ${escapeHtml(vizState.bins.labels[index])} — ${label}</b><div class="mini-list">${examples.map(e=>`<button onclick="selectPointByRawIndex(${e.i})"><span>#${e.i}</span><span>${valueText(e.actual)} → ${valueText(e.predicted)}</span><b>${formatSigned(e.error)}</b></button>`).join('') || '<p>نمونه‌ای در این بازه نیست.</p>'}</div>`);
+  const label = isRegression() ? (Math.abs(center) < vizState.bins.step ? 'نزدیک به دقیق' : center < 0 ? 'کم‌برآورد' : 'بیش‌برآورد') : (index === 0 ? 'پیش‌بینی درست' : 'پیش‌بینی غلط');
+  const title = isRegression() ? `بازه ${escapeHtml(vizState.bins.labels[index])} — ${label}` : `${label}: ${formatNumber(vizState.bins.counts[index])} خانه`;
+  setPanel('binPanel', `<b>${title}</b><div class="mini-list">${examples.map(e=>`<button onclick="selectPointByRawIndex(${e.i})"><span>#${e.i}</span><span>${valueText(e.actual)} → ${valueText(e.predicted)}</span><b>${isRegression()?formatSignedMoney(e.error):(Number(e.error)===0?'درست':'غلط')}</b></button>`).join('') || '<p>نمونه‌ای در این بازه نیست.</p>'}</div>`);
   charts.errors?.update();
   if(renderScatterLink) charts.scatter?.update();
 }
@@ -215,15 +228,21 @@ function selectFeature(index){
   charts.importance.update();
 }
 
-function histogram(values, n){
+function histogram(values, n, formatter=formatNumber){
   const nums = values.map(Number), min=Math.min(...nums), max=Math.max(...nums), step=(max-min||1)/n, counts=Array(n).fill(0), members=Array.from({length:n},()=>[]);
   nums.forEach((x,i)=>{ const b=Math.min(n-1, Math.floor((x-min)/step)); counts[b]++; members[b].push(i); });
-  return {labels:counts.map((_,i)=>`${(min+i*step).toFixed(1)} تا ${(min+(i+1)*step).toFixed(1)}`), centers:counts.map((_,i)=>min+(i+.5)*step), counts, members, min, max, step};
+  return {labels:counts.map((_,i)=>`${formatter(min+i*step)} تا ${formatter(min+(i+1)*step)}`), centers:counts.map((_,i)=>min+(i+.5)*step), counts, members, min, max, step};
+}
+function classificationSummary(v){
+  const members=[[],[]];
+  (v.is_correct || v.actual.map((a,i)=>Number(a)===Number(v.predicted[i]))).forEach((ok,i)=>members[ok?0:1].push(i));
+  return {labels:['درست','غلط'], centers:[0,1], counts:members.map(m=>m.length), members, min:0, max:1, step:1};
 }
 function findBin(error){ return Math.min(vizState.bins.counts.length-1, Math.max(0, Math.floor((Number(error)-vizState.bins.min)/vizState.bins.step))); }
+function findClassBin(p){ return classOutcome(p) ? 0 : 1; }
 function resetPanels(){
   setPanel('pointPanel','برای دیدن واقعی، پیش‌بینی، خطا و تفسیر، یک نقطه را انتخاب کنید.');
-  setPanel('binPanel','یک ستون خطا را انتخاب کنید تا نمونه‌های آن بازه نمایش داده شود.');
+  setPanel('binPanel', isRegression() ? 'یک ستون خطا را انتخاب کنید تا نمونه‌های آن بازه نمایش داده شود.' : 'ستون درست یا غلط را انتخاب کنید تا نمونه‌ها نمایش داده شوند.');
   setPanel('featurePanel','یک ویژگی را انتخاب کنید تا معنی اهمیت و محدودیت آن را ببینید.');
 }
 

@@ -41,7 +41,15 @@ def evaluation(task: str, dataset: str, model_name: str) -> dict[str, Any]:
     else:
         errors = y_pred - y_test
         metrics = {"accuracy": float(accuracy_score(y_test, y_pred)), "f1": float(f1_score(y_test, y_pred, average="weighted"))}
-    return {"metrics": metrics, "actual": y_test.tolist(), "predicted": y_pred.tolist(), "errors": errors.tolist()}
+
+    result = {"metrics": metrics, "actual": y_test.tolist(), "predicted": y_pred.tolist(), "errors": errors.tolist()}
+    if task == "classification":
+        result.update({
+            "is_correct": (y_pred == y_test).tolist(),
+            "actual_class": y_test.tolist(),
+            "predicted_class": y_pred.tolist(),
+        })
+    return result
 
 
 @lru_cache(maxsize=64)
