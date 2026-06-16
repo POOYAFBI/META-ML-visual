@@ -100,3 +100,8 @@ class VisualizationResponse(BaseModel):
     actual_class: list[Any] | None = None
     predicted_class: list[Any] | None = None
     class_labels: dict[str, str] | None = None
+    confusion_matrix: dict[str, Any] | None = None
+    classwise_metrics: dict[str, Any] | None = None
+    prediction_confidence: list[float] | None = None
+    class_probabilities: list[dict[str, float]] | None = None
+    confident_mistakes: list[dict[str, Any]] | None = None
