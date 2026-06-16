@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from .services.model_loader import available_options, load_bundle
 from .services.predictor import predict
 from .services.metrics import evaluation, feature_importance
+from .services.comparison import comparison
 from .services.inputs import list_presets, list_samples, preset_features, sample_features
 from .services.feature_metadata import feature_meta
 
@@ -66,6 +67,13 @@ def predict_endpoint(req: PredictRequest):
                 raise ValueError("sample_id is required for dataset mode")
             features = sample_features(req.task, req.dataset, req.model, req.sample_id)
         return predict(req.task, req.dataset, req.model, features)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+@app.get("/api/comparison")
+def comparison_endpoint(task: str = Query(...)):
+    try:
+        return comparison(task)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

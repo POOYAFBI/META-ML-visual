@@ -43,7 +43,13 @@ def evaluation(task: str, dataset: str, model_name: str) -> dict[str, Any]:
         metrics = {"rmse": float(np.sqrt(mean_squared_error(y_test, y_pred))), "r2": float(r2_score(y_test, y_pred))}
     else:
         errors = y_pred - y_test
-        metrics = {"accuracy": float(accuracy_score(y_test, y_pred)), "f1": float(f1_score(y_test, y_pred, average="weighted"))}
+        weighted_f1 = float(f1_score(y_test, y_pred, average="weighted"))
+        metrics = {
+            "accuracy": float(accuracy_score(y_test, y_pred)),
+            "f1": weighted_f1,
+            "weighted_f1": weighted_f1,
+            "macro_f1": float(f1_score(y_test, y_pred, average="macro")),
+        }
 
     result = {"metrics": metrics, "actual": y_test.tolist(), "predicted": y_pred.tolist(), "errors": errors.tolist()}
     if task == "regression":
