@@ -98,16 +98,16 @@ async function loadAll(){
 }
 
 const metricDisplay = {
-  rmse: {title: 'میانگین خطا', original: 'RMSE', format: formatMoney, caption: 'هرچه کمتر بهتر؛ میانگین اندازه خطاهای مدل را نشان می‌دهد.'},
-  r2: {title: 'قدرت توضیح مدل', original: 'R²', format: percent, caption: 'هرچه به ۱۰۰٪ نزدیک‌تر بهتر؛ سهم تغییرات توضیح‌داده‌شده توسط مدل است.'},
-  accuracy: {title: 'دقت', original: 'Accuracy', format: percent, caption: 'هرچه به ۱۰۰٪ نزدیک‌تر بهتر؛ سهم پیش‌بینی‌های درست را نشان می‌دهد.'},
-  f1: {title: 'امتیاز F1', original: 'F1', format: percent, caption: 'هرچه به ۱۰۰٪ نزدیک‌تر بهتر؛ تعادل دقت و پوشش کلاس‌ها را خلاصه می‌کند.'}
+  rmse: {title: 'میانگین خطا', original: 'RMSE', format: formatMoney, caption: 'کمتر بهتر است؛ میانگین اندازه خطای مدل را نشان می‌دهد.'},
+  r2: {title: 'قدرت توضیح مدل', original: 'R²', format: percent, caption: 'بیشتر بهتر است؛ سهم توضیح‌داده‌شده از تغییرات قیمت.'},
+  accuracy: {title: 'دقت طبقه‌بندی', original: 'Accuracy', format: percent, caption: 'بیشتر بهتر است؛ سهم پیش‌بینی‌های درست را نشان می‌دهد.'},
+  f1: {title: 'امتیاز F1', original: 'F1 Score', format: percent, caption: 'بیشتر بهتر است؛ تعادل دقت و پوشش کلاس‌ها را خلاصه می‌کند.'}
 };
 
 function renderMetrics(metrics){
   $('metrics').innerHTML = Object.entries(metrics).map(([k,v])=>{
     const meta = metricDisplay[k] || {title: k, original: k, format: value=>Number(value).toFixed(4), caption: 'معیار تکمیلی مدل برای ارزیابی عملکرد.'};
-    return `<button class="metric-chip" data-metric="${escapeHtml(k)}"><span class="metric-title">${escapeHtml(meta.title)} <small>${escapeHtml(meta.original)}</small></span><span class="metric-value">${escapeHtml(meta.format(v))}</span><span class="metric-caption">${escapeHtml(meta.caption)}</span></button>`;
+    return `<button class="metric-chip" data-metric="${escapeHtml(k)}"><span class="metric-title">${escapeHtml(meta.title)} <small>(${escapeHtml(meta.original)})</small></span><span class="metric-value">${escapeHtml(meta.format(v))}</span><span class="metric-caption">${escapeHtml(meta.caption)}</span></button>`;
   }).join('');
   document.querySelectorAll('.metric-chip').forEach(btn=>btn.onclick=()=>explainMetric(btn.dataset.metric, metrics[btn.dataset.metric]));
 }
@@ -235,16 +235,22 @@ function renderResult(data){
   const resultIsRegression = meta.task_type === 'regression';
   const title = resultIsRegression ? 'قیمت پیش‌بینی‌شده' : 'کلاس پیش‌بینی‌شده';
   const mainValue = resultIsRegression ? formatMoney(data.prediction) : escapeHtml(data.predicted_class ?? data.prediction);
-  const range = data.prediction_range ? `${formatMoney(data.prediction_range.lower)} — ${formatMoney(data.prediction_range.upper)}` : null;
+  const rangeMeta = data.prediction_range || null;
+  const range = rangeMeta ? `${formatMoney(rangeMeta.lower)} — ${formatMoney(rangeMeta.upper)}` : null;
   const probs = data.class_probabilities ? Object.entries(data.class_probabilities).map(([klass, prob]) => `
     <div class="probability-row"><span>کلاس ${escapeHtml(klass)}</span><div class="probability-track"><i style="width:${Math.max(0, Math.min(100, Number(prob)*100))}%"></i></div><strong>${percent(prob)}</strong></div>`).join('') : '';
-  const confidenceTip = resultIsRegression ? 'در رگرسیون، اعتماد از RMSE نسبت به میانگین هدف ساخته شده و یعنی پیش‌بینی یک تخمین همراه با خطاست.' : 'در طبقه‌بندی، اعتماد همان احتمال کلاس انتخاب‌شده است؛ احتمال‌های نزدیک یعنی مدل مرددتر است.';
+  const confidenceTitle = resultIsRegression ? 'شاخص اطمینان تقریبی (RMSE-based Confidence)' : 'اعتماد مدل';
+  const confidenceTip = resultIsRegression
+    ? (data.confidence_explanation || 'این عدد احتمال درست بودن نیست؛ از نسبت RMSE به میانگین قیمت ساخته شده است.')
+    : 'در طبقه‌بندی، اعتماد همان احتمال کلاس انتخاب‌شده است؛ احتمال‌های نزدیک یعنی مدل مرددتر است.';
+  const rangeHelp = rangeMeta ? 'این بازه تضمینی نیست؛ خطای معمول مدل روی داده آزمون را نشان می‌دهد.' : '';
+  const rangeBasis = rangeMeta?.basis || '±1 RMSE';
   $('resultCard').className = `result-card reliability-${reliability}`;
   $('resultCard').innerHTML = `
     <div class="result-topline"><span>${title}</span><span class="badge">قابلیت اتکا: ${reliabilityFa[reliability] || reliability}</span></div>
     <div class="prediction-value">${mainValue}</div>
-    ${range ? `<div class="range-line" title="این بازه از خطای RMSE ساخته شده و یعنی خروجی عددی دقیق و قطعی نیست.">بازه پیش‌بینی: ${range}</div>` : ''}
-    <div class="confidence-block explainer" title="${escapeHtml(confidenceTip)}"><div><b>اعتماد مدل</b><span>${percent(confidence)}</span></div><div class="progress"><i style="width:${Math.max(0, Math.min(100, confidence * 100))}%"></i></div><small>${escapeHtml(confidenceTip)}</small></div>
+    ${range ? `<div class="range-line explainer" title="${escapeHtml(rangeHelp)}"><b>بازه تقریبی پیش‌بینی (${escapeHtml(rangeBasis)})</b><span>${range}</span><small>${escapeHtml(rangeHelp)}</small></div>` : ''}
+    <div class="confidence-block explainer" title="${escapeHtml(confidenceTip)}"><div><b>${escapeHtml(confidenceTitle)}</b><span>${percent(confidence)}</span></div><div class="progress"><i style="width:${Math.max(0, Math.min(100, confidence * 100))}%"></i></div><small>${escapeHtml(confidenceTip)}</small></div>
     <div class="info-panel"><div><small>مدل</small><b>${escapeHtml(modelLabel(meta.model_name || '-'))}</b></div><div><small>دیتاست</small><b>${escapeHtml(datasetLabel(meta.dataset_used || '-', meta.dataset_type))}</b></div><div><small>نوع مسئله</small><b>${escapeHtml(faTask[meta.task_type] || meta.task_type || '-')}</b></div></div>
     <div class="analysis"><b>تحلیل</b><p>${escapeHtml(data.analysis?.explanation || '')}</p><p id="featureContext" class="muted">با انتخاب یک ویژگی از نمودار اهمیت، ارتباط کلی آن با رفتار مدل اینجا نمایش داده می‌شود.</p></div>
     ${probs ? `<div class="probabilities"><b>احتمال کلاس‌ها</b>${probs}</div>` : ''}`;
