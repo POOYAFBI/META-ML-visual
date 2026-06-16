@@ -18,8 +18,22 @@ FEATURE_LABELS_FA = {
     "OverallQual": "کیفیت کلی",
     "YearBuilt": "سال ساخت",
     "Actual SalePrice": "قیمت واقعی",
+    "Actual price_class": "کلاس واقعی",
     "raw_row_id": "شناسه ردیف خام",
 }
+
+CLASS_LABELS_FA = {
+    0: "ارزان",
+    1: "متوسط",
+    2: "گران",
+}
+
+
+def target_label(task: str, value: Any) -> str:
+    if task == "classification":
+        class_id = int(coerce_value(value))
+        return f"{CLASS_LABELS_FA.get(class_id, 'کلاس')} (کلاس {class_id})"
+    return f"قیمت واقعی: ${int(coerce_value(value)):,}"
 
 
 @lru_cache(maxsize=1)
@@ -43,10 +57,10 @@ def _summary_item(name: str, value: Any, label: str | None = None) -> dict[str, 
     return {"name": name, "label": label or FEATURE_LABELS_FA.get(name, name), "value": value}
 
 
-def _input_summary(features: dict[str, Any], include_target: Any | None = None, raw_row_id: str | None = None) -> list[dict[str, Any]]:
+def _input_summary(features: dict[str, Any], include_target: Any | None = None, raw_row_id: str | None = None, target_name: str = "Actual SalePrice") -> list[dict[str, Any]]:
     summary: list[dict[str, Any]] = []
     if include_target is not None:
-        summary.append(_summary_item("Actual SalePrice", include_target))
+        summary.append(_summary_item(target_name, include_target))
     for name in KEY_FEATURES:
         if name in features:
             summary.append(_summary_item(name, coerce_value(features[name])))
@@ -96,12 +110,14 @@ def list_samples(task: str, dataset: str, model_name: str, limit: int = 10) -> l
         row = rows[row_index]
         features = {name: coerce_value(row.get(name, 0.0)) for name in bundle["features"]}
         target_value = coerce_value(row[target])
+        target_name = "Actual SalePrice" if task == "regression" else "Actual price_class"
         samples.append({
             "id": str(row_index),
             "label": f"نمونه #{display_index}",
             "target": target_value,
+            "target_label": target_label(task, target_value),
             "raw_row_id": str(row_index),
-            "summary": _input_summary(features, include_target=target_value, raw_row_id=str(row_index)),
+            "summary": _input_summary(features, include_target=target_value, raw_row_id=str(row_index), target_name=target_name),
             "features": features,
         })
     return samples

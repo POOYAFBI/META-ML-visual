@@ -7,6 +7,9 @@ import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from .model_loader import load_bundle
+from .feature_metadata import feature_meta
+
+CLASS_LABELS_FA = {0: "ارزان", 1: "متوسط", 2: "گران"}
 
 
 def _num(v: str) -> float:
@@ -43,11 +46,19 @@ def evaluation(task: str, dataset: str, model_name: str) -> dict[str, Any]:
         metrics = {"accuracy": float(accuracy_score(y_test, y_pred)), "f1": float(f1_score(y_test, y_pred, average="weighted"))}
 
     result = {"metrics": metrics, "actual": y_test.tolist(), "predicted": y_pred.tolist(), "errors": errors.tolist()}
+    if task == "regression":
+        result.update({
+            "error_definition": "predicted - actual",
+            "error_unit": "USD",
+            "ideal_line_description": "نقطه‌های روی خط ایده‌آل یعنی قیمت پیش‌بینی‌شده دقیقاً برابر قیمت واقعی است.",
+        })
     if task == "classification":
+        unique_classes = sorted({int(v) for v in np.concatenate([y_test, y_pred])})
         result.update({
             "is_correct": (y_pred == y_test).tolist(),
             "actual_class": y_test.tolist(),
             "predicted_class": y_pred.tolist(),
+            "class_labels": {str(cls): CLASS_LABELS_FA.get(cls, f"کلاس {cls}") for cls in unique_classes},
         })
     return result
 
@@ -68,4 +79,14 @@ def feature_importance(task: str, dataset: str, model_name: str) -> list[dict[st
     if values is None:
         return []
     pairs = sorted(zip(bundle["features"], values), key=lambda p: float(p[1]), reverse=True)[:20]
-    return [{"feature": f, "importance": float(v)} for f, v in pairs]
+    return [
+        {
+            "feature": f,
+            "importance": float(v),
+            "display_name_fa": feature_meta(f)["display_name_fa"],
+            "display_name_en": feature_meta(f)["display_name_en"],
+            "raw_feature": feature_meta(f)["raw_feature"],
+            "feature_group": feature_meta(f)["feature_group"],
+        }
+        for f, v in pairs
+    ]
