@@ -22,24 +22,32 @@
     <button id="load">بارگذاری</button>
   </section>
 
-  <section class="grid">
-    <section class="card">
-      <h2>ورودی پیش‌بینی</h2>
-      <p id="featureCount"></p>
-      <div id="presetPanel" class="mode-panel"><label>پروفایل ملک<select id="preset"></select></label><div id="presetPreview" class="preview-card"></div></div>
-      <div id="samplePanel" class="mode-panel"><label>ردیف واقعی دیتاست<select id="sample"></select></label><div id="samplePreview" class="preview-card"></div></div>
-      <div id="advancedPanel" class="mode-panel"><details open class="advanced-raw"><summary>برای کاربران فنی (Advanced / Raw Features)</summary><p class="muted">کنار هر برچسب فارسی، نام خام feature مدل هم نمایش داده شده است.</p><div id="form" class="form"></div></details></div>
-      <button id="predict">پیش‌بینی</button>
-      <div id="loading" class="loading" hidden>در حال محاسبه پیش‌بینی...</div>
-      <div id="resultCard" class="result-card empty-state">نتیجه پیش‌بینی اینجا نمایش داده می‌شود.</div>
-      <details id="technicalDetails" class="technical-details" hidden>
-        <summary>پاسخ خام API (Raw API Response)</summary>
-        <pre id="result"></pre>
-      </details>
+  <section class="prediction-grid">
+    <section class="main-action-column">
+      <section class="card input-card">
+        <h2>ورودی پیش‌بینی</h2>
+        <p id="featureCount"></p>
+        <div id="presetPanel" class="mode-panel"><label>پروفایل ملک<select id="preset"></select></label><div id="presetPreview" class="preview-card"></div></div>
+        <div id="samplePanel" class="mode-panel"><label>ردیف واقعی دیتاست<select id="sample"></select></label><div id="samplePreview" class="preview-card"></div></div>
+        <div id="advancedPanel" class="mode-panel"><details open class="advanced-raw"><summary>برای کاربران فنی (Advanced / Raw Features)</summary><p class="muted">کنار هر برچسب فارسی، نام خام feature مدل هم نمایش داده شده است.</p><div id="form" class="form"></div></details></div>
+        <button id="predict">پیش‌بینی</button>
+        <div id="loading" class="loading" hidden>در حال محاسبه پیش‌بینی...</div>
+      </section>
+      <section class="card result-shell">
+        <h2>نتیجه</h2>
+        <div id="resultCard" class="result-card empty-state">نتیجه پیش‌بینی اینجا نمایش داده می‌شود.</div>
+        <details id="technicalDetails" class="technical-details" hidden>
+          <summary>پاسخ خام API (Raw API Response)</summary>
+          <pre id="result"></pre>
+        </details>
+      </section>
     </section>
-    <section class="card">
-      <h2>معیارهای واقعی</h2>
-      <div id="metrics"></div>
+    <section class="card metric-shell">
+      <div class="section-heading">
+        <h2>معیارهای واقعی</h2>
+        <p class="muted">برای مقایسه سریع کیفیت مدل؛ تمرکز اصلی همچنان روی نتیجه پیش‌بینی است.</p>
+      </div>
+      <div id="metrics" class="metric-grid"></div>
     </section>
   </section>
 
