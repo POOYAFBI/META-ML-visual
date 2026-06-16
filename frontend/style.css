@@ -65,8 +65,12 @@ canvas{max-height:360px}
 .mini-list{display:grid;gap:8px;margin-top:10px}
 .mini-list button{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;background:white;color:#0f172a;border:1px solid #bfdbfe;text-align:right}
 .mini-list button:hover{background:#dbeafe;transform:none}
-.metric-chip{width:100%;display:flex;justify-content:space-between;align-items:center;background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0;margin-bottom:10px}
+.metric-chip{width:100%;display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center;background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0;margin-bottom:10px;text-align:right}
 .metric-chip:hover{background:#eff6ff;color:#1d4ed8;transform:none}
+.metric-title{font-weight:900;line-height:1.6}
+.metric-title small{direction:ltr;display:inline-block;color:#64748b;font-size:12px;font-weight:800;margin-right:6px}
+.metric-value{direction:ltr;text-align:left;font-size:18px;font-weight:900;color:#0f172a}
+.metric-caption{grid-column:1/-1;color:#64748b;font-size:12px;line-height:1.8}
 .warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px}
 .explainer small{display:block;color:#64748b;line-height:1.7;margin-top:8px}
 .probability-row{gap:12px}
