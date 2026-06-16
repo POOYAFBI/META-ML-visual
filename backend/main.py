@@ -39,7 +39,6 @@ def features(task: str = Query(...), dataset: str = Query(...), model: str = Que
         raise HTTPException(status_code=404, detail=str(exc))
 
 @app.get("/api/presets")
-@app.get("/presets")
 def presets(task: str, dataset: str):
     try:
         return {"presets": list_presets(task, dataset)}
@@ -47,7 +46,6 @@ def presets(task: str, dataset: str):
         raise HTTPException(status_code=400, detail=str(exc))
 
 @app.get("/api/samples")
-@app.get("/samples")
 def samples(task: str, dataset: str, model: str, limit: int = 10):
     try:
         return {"samples": list_samples(task, dataset, model, limit)}
