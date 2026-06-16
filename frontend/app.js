@@ -61,6 +61,42 @@ function pointBorderColor(level, selected){ return selected ? '#4c1d95' : 'rgba(
 function classOutcome(p){ return p.is_correct ?? Number(p.actual) === Number(p.predicted); }
 function setPanel(id, html){ $(id).innerHTML = html; }
 
+function formatSummaryValue(item){
+  if(item.name === 'Actual SalePrice') return formatMoney(item.value);
+  if(String(item.name || '').startsWith('Neighborhood_')) return item.value;
+  return formatNumber(item.value);
+}
+function renderPreviewCard(targetId, item, emptyText){
+  if(!item){ $(targetId).innerHTML = `<p class="muted">${escapeHtml(emptyText)}</p>`; return; }
+  const summary = (item.summary || []).slice(0, 6).map(x=>`
+    <li><b>${escapeHtml(x.label)}</b><span>${escapeHtml(formatSummaryValue(x))}</span><small>${escapeHtml(x.name)}</small></li>`).join('');
+  $(targetId).innerHTML = `<h3>${escapeHtml(item.label)}</h3><p>${escapeHtml(item.description || 'این انتخاب یک بردار کامل ویژگی برای مدل می‌سازد.')}</p><ul class="summary-list">${summary}</ul>`;
+}
+function renderPresetPreview(){ renderPreviewCard('presetPreview', currentPresets.find(p=>p.id===$('preset').value) || currentPresets[0], 'برای این انتخاب پریستی وجود ندارد.'); }
+function renderSamplePreview(){ renderPreviewCard('samplePreview', currentSamples.find(s=>s.id===$('sample').value) || currentSamples[0], 'نمونه‌ای برای نمایش وجود ندارد.'); }
+function groupedFeatures(features){
+  const oneHotGroups = {};
+  const groups = {};
+  features.forEach(f=>{
+    if(f.inputKind === 'oneHotOption'){ (oneHotGroups[f.oneHotGroup] ||= []).push(f); return; }
+    (groups[f.group || 'featureهای فنی'] ||= []).push(f);
+  });
+  Object.entries(oneHotGroups).forEach(([groupName, opts])=>{
+    const group = opts[0]?.group || 'featureهای فنی';
+    (groups[group] ||= []).push({kind:'oneHotSelect', name:groupName, labelFa: groupName === 'Neighborhood' ? 'محله' : groupName, rawName: groupName, options: opts});
+  });
+  return groups;
+}
+function renderAdvancedForm(features){
+  const order = ['مشخصات کلی','مساحت‌ها','کیفیت و وضعیت','محله','امکانات','featureهای فنی'];
+  const groups = groupedFeatures(features);
+  $('form').innerHTML = order.filter(g=>groups[g]?.length).map(group=>`
+    <section class="feature-group"><h3>${escapeHtml(group)}</h3><div class="feature-grid">${groups[group].map(f=>{
+      if(f.kind === 'oneHotSelect') return `<label>${escapeHtml(f.labelFa)} <small>${escapeHtml(f.rawName)}</small><select data-onehot-group="${escapeHtml(f.name)}"><option value="">هیچ‌کدام / پایه</option>${f.options.map(o=>`<option value="${escapeHtml(o.rawName)}">${escapeHtml(o.oneHotValue)} (${escapeHtml(o.rawName)})</option>`).join('')}</select></label>`;
+      return `<label>${escapeHtml(f.labelFa)} <small>${escapeHtml(f.rawName)}</small><input name="${escapeHtml(f.name)}" title="${escapeHtml(f.help || '')}" type="number" step="any" value="0"></label>`;
+    }).join('')}</div></section>`).join('');
+}
+
 async function loadOptions(){
   const data = await api('/api/options');
   function fill(){
@@ -83,16 +119,17 @@ function switchMode(){
 async function loadAll(){
   const schema = await api('/api/features?'+params()); currentFeatures = schema.features;
   $('featureCount').textContent = `${currentFeatures.length} ویژگی کامل برای مدل انتخاب‌شده آماده می‌شود`;
-  $('form').innerHTML = currentFeatures.map(f=>`<label>${escapeHtml(humanizeFeatureName(f.name))}<input name="${escapeHtml(f.name)}" type="number" step="any" value="0"></label>`).join('');
+  renderAdvancedForm(currentFeatures);
 
   currentPresets = (await api(`/api/presets?task=${$('task').value}&dataset=${$('dataset').value}`)).presets;
   $('preset').innerHTML = currentPresets.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.label)}</option>`).join('');
-  $('presetHelp').textContent = currentPresets[0]?.description || 'برای این انتخاب پریستی وجود ندارد.';
-  $('preset').onchange = () => $('presetHelp').textContent = currentPresets.find(p=>p.id===$('preset').value)?.description || '';
+  renderPresetPreview();
+  $('preset').onchange = renderPresetPreview;
 
   currentSamples = (await api('/api/samples?'+params()+'&limit=10')).samples;
-  $('sample').innerHTML = currentSamples.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)} — هدف واقعی: ${Number(s.target).toLocaleString('fa-IR')}</option>`).join('');
-  $('sampleHelp').textContent = 'این حالت یک ردیف واقعی را به بردار کامل ویژگی تبدیل می‌کند.';
+  $('sample').innerHTML = currentSamples.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('');
+  renderSamplePreview();
+  $('sample').onchange = renderSamplePreview;
 
   const metrics = await api('/api/metrics?'+params());
   renderMetrics(metrics.metrics);
@@ -278,7 +315,12 @@ function renderResult(data){
 $('load').onclick = loadAll;
 $('predict').onclick = async()=>{
   const body = {task:$('task').value,dataset:$('dataset').value,model:$('model').value,input_mode:activeMode(),features:{}};
-  if(activeMode()==='advanced') document.querySelectorAll('#form input').forEach(i=>body.features[i.name]=Number(i.value||0));
+  if(activeMode()==='advanced'){
+    document.querySelectorAll('#form input').forEach(i=>body.features[i.name]=Number(i.value||0));
+    document.querySelectorAll('#form select[data-onehot-group]').forEach(sel=>{
+      currentFeatures.filter(f=>f.oneHotGroup===sel.dataset.onehotGroup).forEach(f=>body.features[f.name]=f.rawName===sel.value?1:0);
+    });
+  }
   if(activeMode()==='preset') body.preset_id = $('preset').value;
   if(activeMode()==='dataset') body.sample_id = $('sample').value;
   $('loading').hidden = false; $('predict').disabled = true;
