@@ -50,6 +50,54 @@
       <div id="metrics" class="metric-grid"></div>
     </section>
   </section>
+  <section class="card comparison-shell" id="modelComparisonSection">
+    <div class="comparison-heading">
+      <div>
+        <p class="eyebrow">Analysis Area</p>
+        <h2>مقایسه عملکرد مدل‌ها</h2>
+        <p class="muted">Model Performance Comparison — مقایسه آماری و بصری مدل‌ها روی دیتاست‌های مختلف با داده mock.</p>
+      </div>
+      <div class="comparison-tabs" role="tablist" aria-label="Model comparison task tabs">
+        <button id="comparisonRegressionTab" class="comparison-tab active" type="button" role="tab" aria-selected="true" data-comparison-task="regression">رگرسیون (Regression)</button>
+        <button id="comparisonClassificationTab" class="comparison-tab" type="button" role="tab" aria-selected="false" data-comparison-task="classification">طبقه‌بندی (Classification)</button>
+      </div>
+    </div>
+
+    <div id="comparisonSummary" class="comparison-summary"></div>
+
+    <div class="comparison-layout">
+      <article class="comparison-table-card">
+        <div class="section-heading">
+          <div>
+            <h3>جدول مقایسه</h3>
+            <p class="muted">Persian labels are shown first; raw model and dataset names are preserved in muted technical text.</p>
+          </div>
+        </div>
+        <div class="comparison-table-wrap">
+          <table class="comparison-table" id="comparisonTable"></table>
+        </div>
+      </article>
+
+      <aside class="comparison-detail-card" id="comparisonDetailPanel">
+        یک ردیف جدول یا ستون نمودار را انتخاب کنید تا جزئیات نمایش داده شود.
+      </aside>
+    </div>
+
+    <div class="comparison-charts">
+      <article class="chart-card comparison-chart-card">
+        <h3 id="comparisonChartOneTitle"></h3>
+        <p class="chart-help" id="comparisonChartOneHelp"></p>
+        <canvas id="comparisonChartOne"></canvas>
+      </article>
+      <article class="chart-card comparison-chart-card">
+        <h3 id="comparisonChartTwoTitle"></h3>
+        <p class="chart-help" id="comparisonChartTwoHelp"></p>
+        <canvas id="comparisonChartTwo"></canvas>
+      </article>
+    </div>
+
+    <div class="comparison-insights" id="comparisonInsights"></div>
+  </section>
 
   <section class="card learning-shell">
     <div class="chart-heading">

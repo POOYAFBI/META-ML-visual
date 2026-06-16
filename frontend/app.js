@@ -344,3 +344,100 @@ $('predict').onclick = async()=>{
   }
 };
 loadOptions().catch(e=>alert(e.message));
+
+const comparisonMockData = {
+  regression: {
+    primaryMetric: 'RMSE',
+    metricDirection: {rmse:'lower', mae:'lower', r2:'higher', normalizedRmse:'lower'},
+    rows: [
+      {id:'reg-a-rf', datasetId:'A', datasetLabelFa:'دیتاست A — پایه', datasetLabelEn:'Dataset A / Baseline Housing', datasetRawName:'baseline_dataset', modelLabelFa:'جنگل تصادفی', modelLabelEn:'Random Forest', modelRawName:'random_forest', rmse:27450, mae:18220, r2:0.89, normalizedRmse:0.118, rank:1, interpretation:'بهترین تعادل خطا و توضیح‌پذیری؛ روی داده پایه پایدارترین رفتار را دارد.'},
+      {id:'reg-b-xgb', datasetId:'B', datasetLabelFa:'دیتاست B — ویژگی‌سازی‌شده', datasetLabelEn:'Dataset B / Enhanced Features', datasetRawName:'enhanced_dataset', modelLabelFa:'ایکس‌جی‌بوست', modelLabelEn:'XGBoost', modelRawName:'xgboost', rmse:28680, mae:19040, r2:0.875, normalizedRmse:0.123, rank:2, interpretation:'با ویژگی‌های بیشتر بهتر از مدل خطی عمل می‌کند اما کمی واریانس خطا دارد.'},
+      {id:'reg-b-rf', datasetId:'B', datasetLabelFa:'دیتاست B — ویژگی‌سازی‌شده', datasetLabelEn:'Dataset B / Enhanced Features', datasetRawName:'enhanced_dataset', modelLabelFa:'جنگل تصادفی', modelLabelEn:'Random Forest', modelRawName:'random_forest', rmse:30120, mae:20110, r2:0.862, normalizedRmse:0.129, rank:3, interpretation:'رفتار مقاوم دارد اما نسبت به دیتاست پایه اندکی خطای نرمال‌شده بالاتر است.'},
+      {id:'reg-a-linear', datasetId:'A', datasetLabelFa:'دیتاست A — پایه', datasetLabelEn:'Dataset A / Baseline Housing', datasetRawName:'baseline_dataset', modelLabelFa:'رگرسیون خطی', modelLabelEn:'Linear Regression', modelRawName:'linear_regression', rmse:39200, mae:26500, r2:0.751, normalizedRmse:0.169, rank:4, interpretation:'خط مبنا قابل فهم است ولی الگوهای غیرخطی قیمت را کامل نمی‌گیرد.'}
+    ]
+  },
+  classification: {
+    primaryMetric: 'Weighted F1',
+    metricDirection: {accuracy:'higher', weightedF1:'higher', macroF1:'higher'},
+    rows: [
+      {id:'cls-c-xgb', datasetId:'C', datasetLabelFa:'دیتاست C — ویژگی‌سازی طبقه‌بندی', datasetLabelEn:'Dataset C / Classification Features', datasetRawName:'enhanced_dataset', modelLabelFa:'ایکس‌جی‌بوست', modelLabelEn:'XGBoost', modelRawName:'xgboost', accuracy:0.884, weightedF1:0.879, macroF1:0.842, rank:1, interpretation:'بهترین عملکرد کلی؛ کلاس‌های پرتعداد و کم‌تعداد را نسبتاً متوازن مدیریت می‌کند.'},
+      {id:'cls-c-rf', datasetId:'C', datasetLabelFa:'دیتاست C — ویژگی‌سازی طبقه‌بندی', datasetLabelEn:'Dataset C / Classification Features', datasetRawName:'enhanced_dataset', modelLabelFa:'جنگل تصادفی', modelLabelEn:'Random Forest', modelRawName:'random_forest', accuracy:0.861, weightedF1:0.854, macroF1:0.811, rank:2, interpretation:'دقت خوب دارد اما برای کلاس‌های کوچک‌تر کمی افت Macro F1 دیده می‌شود.'},
+      {id:'cls-a-log', datasetId:'A', datasetLabelFa:'دیتاست A — پایه', datasetLabelEn:'Dataset A / Baseline Housing', datasetRawName:'baseline_dataset', modelLabelFa:'رگرسیون لجستیک', modelLabelEn:'Logistic Regression', modelRawName:'logistic_regression', accuracy:0.812, weightedF1:0.801, macroF1:0.754, rank:3, interpretation:'مدل ساده و قابل توضیح است؛ برای مرزبندی‌های غیرخطی محدودیت دارد.'},
+      {id:'cls-b-log', datasetId:'B', datasetLabelFa:'دیتاست B — ویژگی‌سازی‌شده', datasetLabelEn:'Dataset B / Enhanced Features', datasetRawName:'enhanced_dataset', modelLabelFa:'رگرسیون لجستیک', modelLabelEn:'Logistic Regression', modelRawName:'logistic_regression', accuracy:0.793, weightedF1:0.782, macroF1:0.731, rank:4, interpretation:'افزایش ویژگی‌ها برای مدل خطی الزاماً سودمند نیست و احتمال نویز را بالا می‌برد.'}
+    ]
+  }
+};
+let comparisonState = {task:'regression', selectedId:null};
+function comparisonRows(){ return comparisonMockData[comparisonState.task].rows; }
+function comparisonLabel(row){ return `${row.datasetLabelFa} (${row.datasetLabelEn}) / ${row.modelLabelFa} (${row.modelLabelEn})`; }
+function comparisonMetricValue(row, key){ return key === 'normalizedRmse' ? row.normalizedRmse : row[key]; }
+function formatMetricValue(value, kind){ return ['accuracy','weightedF1','macroF1','r2','normalizedRmse'].includes(kind) ? percent(value) : formatMoney(value); }
+function bestComparisonRow(){ return comparisonRows().find(r=>r.rank===1) || comparisonRows()[0]; }
+function metricClass(row, key){ const rows=comparisonRows(), dir=comparisonMockData[comparisonState.task].metricDirection[key]; const vals=rows.map(r=>comparisonMetricValue(r,key)); const best=dir==='lower'?Math.min(...vals):Math.max(...vals); return comparisonMetricValue(row,key)===best?' best-metric':''; }
+function renderComparison(){
+  const task=comparisonState.task, cfg=comparisonMockData[task], rows=cfg.rows, best=bestComparisonRow();
+  if(!comparisonState.selectedId) comparisonState.selectedId=best.id;
+  document.querySelectorAll('.comparison-tab').forEach(btn=>{ const active=btn.dataset.comparisonTask===task; btn.classList.toggle('active',active); btn.setAttribute('aria-selected', String(active)); });
+  $('comparisonSummary').innerHTML = [
+    ['Best model', `${best.modelLabelFa} (${best.modelLabelEn})`, best.modelRawName],
+    ['Best dataset/model pair', comparisonLabel(best), `${best.datasetRawName} / ${best.modelRawName}`],
+    ['Primary metric', cfg.primaryMetric, task==='regression'?'lower is better for RMSE':'higher is better for Weighted F1'],
+    ['Key takeaway', best.interpretation, 'Mock data only — ready for future API shape']
+  ].map(([t,v,s])=>`<article class="summary-card"><span>${escapeHtml(t)}</span><strong>${escapeHtml(v)}</strong><small>${escapeHtml(s)}</small></article>`).join('');
+  const reg=task==='regression';
+  const cols=reg?['Dataset','Model','RMSE','MAE','R²','Normalized RMSE','Rank']:['Dataset','Model','Accuracy','Weighted F1','Macro F1','Rank'];
+  $('comparisonTable').innerHTML = `<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="${r.rank===1?'best-row ':''}${r.id===comparisonState.selectedId?'selected-row':''}" data-comparison-id="${r.id}"><td><b>${escapeHtml(r.datasetLabelFa)}</b><small>${escapeHtml(r.datasetLabelEn)} · raw: ${escapeHtml(r.datasetRawName)} · id: ${escapeHtml(r.datasetId)}</small></td><td><b>${escapeHtml(r.modelLabelFa)}</b><small>${escapeHtml(r.modelLabelEn)} · raw: ${escapeHtml(r.modelRawName)}</small></td>${reg?`<td class="number${metricClass(r,'rmse')}">${formatMoney(r.rmse)}</td><td class="number${metricClass(r,'mae')}">${formatMoney(r.mae)}</td><td class="number${metricClass(r,'r2')}">${percent(r.r2)}</td><td class="number${metricClass(r,'normalizedRmse')}">${percent(r.normalizedRmse)}</td>`:`<td class="number${metricClass(r,'accuracy')}">${percent(r.accuracy)}</td><td class="number${metricClass(r,'weightedF1')}">${percent(r.weightedF1)}</td><td class="number${metricClass(r,'macroF1')}">${percent(r.macroF1)}</td>`}<td><span class="rank-pill">#${formatNumber(r.rank)}</span></td></tr>`).join('')}</tbody>`;
+  document.querySelectorAll('#comparisonTable tbody tr').forEach(tr=>tr.onclick=()=>selectComparisonRow(tr.dataset.comparisonId));
+  renderComparisonCharts(); renderComparisonInsights(); renderComparisonDetail();
+}
+function selectComparisonRow(id){ comparisonState.selectedId=id; renderComparison(); }
+function renderComparisonCharts(){
+  const reg=comparisonState.task==='regression', rows=comparisonRows();
+  destroy('comparisonOne'); destroy('comparisonTwo');
+  $('comparisonChartOneTitle').textContent=reg?'RMSE by model/dataset':'Accuracy by model/dataset';
+  $('comparisonChartOneHelp').textContent=reg?'RMSE: lower is better. MAE: lower is better.':'Accuracy/F1: higher is better.';
+  $('comparisonChartTwoTitle').textContent=reg?'R² by model/dataset':'Weighted F1 by model/dataset';
+  $('comparisonChartTwoHelp').textContent=reg?'R²: higher is better.':'Accuracy/F1: higher is better.';
+  const labels=rows.map(comparisonLabel), colors=rows.map(r=>r.id===comparisonState.selectedId?'#7c3aed':r.rank===1?'#22c55e':'#2563eb');
+  const make = (canvas, key, name) => new Chart($(canvas), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: name,
+        data: rows.map(r => comparisonMetricValue(r, key)),
+        backgroundColor: colors,
+        borderColor: rows.map(r => r.rank === 1 ? '#166534' : 'transparent'),
+        borderWidth: 2
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => `${name}: ${formatMetricValue(c.raw, key)}`}}},
+      onClick: (evt, els) => { if(els[0]) selectComparisonRow(rows[els[0].index].id); },
+      scales: {
+        x: {beginAtZero: true, ticks: {callback: v => formatMetricValue(v, key)}},
+        y: {ticks: {autoSkip: false}}
+      }
+    }
+  });
+  charts.comparisonOne=make('comparisonChartOne', reg?'rmse':'accuracy', reg?'RMSE':'Accuracy');
+  charts.comparisonTwo=make('comparisonChartTwo', reg?'r2':'weightedF1', reg?'R²':'Weighted F1');
+}
+function renderComparisonInsights(){
+  const reg=comparisonState.task==='regression';
+  $('comparisonInsights').innerHTML = [
+    ['Overall takeaway', reg?'در داده mock، مدل‌های درختی خطای قیمت را کمتر از مدل خطی نگه می‌دارند.':'در داده mock، XGBoost بهترین Weighted F1 را دارد و تعادل کلاس‌ها بهتر حفظ شده است.'],
+    ['Dataset effect', reg?'تغییر دیتاست همیشه بهبود ایجاد نمی‌کند؛ Normalized RMSE کمک می‌کند اثر مقیاس قیمت کنترل شود.':'ویژگی‌سازی طبقه‌بندی برای مدل‌های غیرخطی مفیدتر از مدل لجستیک ساده است.'],
+    ['Model behavior', reg?'Random Forest پایدار است؛ XGBoost حساس‌تر ولی رقابتی است؛ Linear Regression خط مبنای قابل توضیح می‌دهد.':'مدل‌های غیرخطی مرزهای تصمیم پیچیده‌تر را بهتر می‌گیرند اما باید با Macro F1 کنترل شوند.'],
+    ['Metric caution', reg?'RMSE به خطاهای بزرگ حساس است؛ MAE و R² را همزمان بخوانید.':'Accuracy در کلاس‌های نامتوازن کافی نیست؛ Weighted F1 و Macro F1 را کنار آن ببینید.']
+  ].map(([h,p])=>`<article><h3>${h}</h3><p>${p}</p></article>`).join('');
+}
+function renderComparisonDetail(){
+  const row=comparisonRows().find(r=>r.id===comparisonState.selectedId) || bestComparisonRow(), best=bestComparisonRow(), reg=comparisonState.task==='regression';
+  const delta=reg?row.rmse-best.rmse:best.weightedF1-row.weightedF1;
+  $('comparisonDetailPanel').innerHTML = `<h3>جزئیات انتخاب‌شده</h3><p><b>${escapeHtml(comparisonLabel(row))}</b></p><div class="fact-grid"><span>Dataset raw</span><strong>${escapeHtml(row.datasetRawName)}</strong><span>Model raw</span><strong>${escapeHtml(row.modelRawName)}</strong><span>Rank</span><strong>#${formatNumber(row.rank)}</strong>${reg?`<span>RMSE</span><strong>${formatMoney(row.rmse)}</strong><span>MAE</span><strong>${formatMoney(row.mae)}</strong><span>R²</span><strong>${percent(row.r2)}</strong><span>Normalized RMSE</span><strong>${percent(row.normalizedRmse)}</strong>`:`<span>Accuracy</span><strong>${percent(row.accuracy)}</strong><span>Weighted F1</span><strong>${percent(row.weightedF1)}</strong><span>Macro F1</span><strong>${percent(row.macroF1)}</strong>`}</div><p>${escapeHtml(row.interpretation)}</p><p class="warn">مقایسه با بهترین: ${reg?`RMSE این انتخاب ${formatMoney(delta)} از بهترین ${delta===0?'برابر/بهتر نیست؛ خودش بهترین است':'بیشتر'} است.`:`Weighted F1 این انتخاب ${percent(delta)} ${delta===0?'با بهترین برابر است':'کمتر از بهترین'} است.`}</p>`;
+}
+document.querySelectorAll('.comparison-tab').forEach(btn=>btn.onclick=()=>{comparisonState={task:btn.dataset.comparisonTask, selectedId:null}; renderComparison();});
+renderComparison();
