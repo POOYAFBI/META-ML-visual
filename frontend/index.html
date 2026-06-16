@@ -112,6 +112,27 @@
       <article class="chart-card"><h3 id="errorTitle">توزیع خطای پیش‌بینی (Prediction Error Distribution)</h3><p class="chart-help" id="errorHelp">عدد منفی یعنی کم‌برآورد؛ عدد مثبت یعنی بیش‌برآورد.</p><canvas id="errors"></canvas><div id="binPanel" class="insight-panel">یک ستون خطا را انتخاب کنید.</div></article>
       <article class="chart-card"><h3>لایه فهم ویژگی‌ها</h3><p class="chart-help">هر میله یک اهمیت کلی مدل است، نه دلیل قطعی یک پیش‌بینی خاص.</p><canvas id="importance"></canvas><div id="featurePanel" class="insight-panel">یک ویژگی را انتخاب کنید.</div></article>
     </div>
+    <div id="classificationAnalysisLayer" class="classification-layer" hidden>
+      <article class="chart-card classwise-card">
+        <h3>عملکرد هر کلاس (Class-wise Performance)</h3>
+        <p class="chart-help">Precision می‌گوید وقتی مدل یک کلاس را انتخاب می‌کند چقدر درست است؛ Recall می‌گوید از نمونه‌های واقعی آن کلاس چندتا را پیدا کرده است.</p>
+        <canvas id="classwisePerformance"></canvas>
+        <div id="classwiseSummary" class="summary-strip"></div>
+        <div id="classwisePanel" class="insight-panel">یک کلاس را انتخاب کنید تا جزئیات Precision، Recall، F1 و Support نمایش داده شود.</div>
+      </article>
+      <article class="chart-card confidence-card">
+        <h3>توزیع اطمینان مدل (Confidence Distribution)</h3>
+        <p class="chart-help">اگر خطاهای قرمز در بازه‌های اطمینان بالا زیاد باشند، مدل با اعتماد زیاد اشتباه می‌کند و باید با احتیاط بیشتری تفسیر شود.</p>
+        <canvas id="confidenceDistribution"></canvas>
+        <div id="confidenceFallback" class="insight-panel" hidden></div>
+        <div id="confidencePanel" class="insight-panel">یک بازه اطمینان را انتخاب کنید تا جزئیات نمونه‌ها نمایش داده شود.</div>
+      </article>
+      <article class="chart-card mistakes-card">
+        <h3>اشتباه‌های پر اطمینان (Top Confident Mistakes)</h3>
+        <p class="warn">این نمونه‌ها مهم‌اند چون مدل با اطمینان بالا اشتباه کرده است.</p>
+        <div id="confidentMistakes" class="mistake-list"></div>
+      </article>
+    </div>
   </section>
 </main>
 <script src="/app.js"></script>

@@ -165,20 +165,20 @@ function explainMetric(metric, value){
 
 async function drawCharts(){
   const v = await api('/api/visualization?'+params());
-  destroy('scatter'); destroy('errors'); destroy('importance');
+  destroy('scatter'); destroy('errors'); destroy('importance'); destroy('classwisePerformance'); destroy('confidenceDistribution');
   const maxAbsError = Math.max(...v.errors.map(e=>Math.abs(Number(e))), 1);
   const points = isRegression()
     ? v.actual.map((a,i)=>({x:a,y:v.predicted[i], actual:a, predicted:v.predicted[i], error:v.errors[i], index:i, severity:severity(v.errors[i], maxAbsError)})).slice(0,400)
     : v.actual.map((a,i)=>{ const ok = v.is_correct?.[i] ?? Number(a) === Number(v.predicted[i]); return {x:ok ? 'درست' : 'غلط', y:ok ? 1 : 0, actual:v.actual_class?.[i] ?? a, predicted:v.predicted_class?.[i] ?? v.predicted[i], error:v.errors[i], index:i, is_correct:ok, severity:ok ? 'low' : 'high'}; }).slice(0,400);
   const bins = isRegression() ? histogram(v.errors, 20, formatMoney) : classificationSummary(v);
-  vizState = {raw:v, points, bins, maxAbsError, selectedPoint:null, selectedBin:null, selectedFeature:null, selectedConfusionCell:null};
+  vizState = {raw:v, points, bins, maxAbsError, selectedPoint:null, selectedBin:null, selectedFeature:null, selectedConfusionCell:null, selectedClass:null, selectedConfidenceBin:null, selectedMistake:null};
   $('taskLesson').textContent = isRegression() ? 'رگرسیون یعنی فاصله عدد پیش‌بینی‌شده با مقدار واقعی را می‌آموزیم.' : 'طبقه‌بندی یعنی درستی کلاس و احتمال انتخاب‌شده را بررسی می‌کنیم.';
   $('scatterTitle').textContent = isRegression() ? 'قیمت واقعی در برابر قیمت پیش‌بینی‌شده' : 'ماتریس خطای طبقه‌بندی (Confusion Matrix)';
   $('errorTitle').textContent = isRegression() ? 'توزیع خطای پیش‌بینی (Prediction Error Distribution)' : 'تعداد پیش‌بینی‌های درست و غلط';
   $('errorHelp').textContent = isRegression() ? v.error_definition ? `تعریف خطا: ${v.error_definition}؛ واحد: ${v.error_unit || 'نامشخص'}.` : 'عدد منفی یعنی کم‌برآورد؛ عدد مثبت یعنی بیش‌برآورد.' : 'این نمودار به جای خطای عددی، تعداد پاسخ‌های درست و غلط طبقه‌بندی را نشان می‌دهد.';
   $('scatterHelp').textContent = isRegression() ? v.ideal_line_description || 'هر نقطه یک خانه است. هرچه به خط ایده‌آل نزدیک‌تر باشد، پیش‌بینی دقیق‌تر است.' : 'خانه‌های روی قطر اصلی پیش‌بینی درست هستند؛ خانه‌های بیرون قطر نشان می‌دهند مدل کدام کلاس‌ها را با هم اشتباه گرفته است.';
   resetPanels();
-  drawScatter(); drawErrors(); drawImportance();
+  drawScatter(); drawErrors(); drawImportance(); drawClassificationLayer();
 }
 
 function scatterBounds(points){
@@ -321,6 +321,94 @@ function selectFeature(index){
   const context = $('featureContext');
   if(context) context.textContent = `ویژگی انتخاب‌شده: ${humanizeFeatureName(f)} | نام فنی: ${f.feature}. این یک نشانه کلی از رفتار مدل است، نه دلیل قطعی همین پیش‌بینی.`;
   charts.importance.update();
+}
+
+function classLabelFor(value){
+  const key = String(value);
+  return vizState?.raw?.class_labels?.[key] || `کلاس ${key}`;
+}
+function classwiseItems(){
+  const entries = Object.entries(vizState?.raw?.classwise_metrics || {});
+  return entries.map(([id, item])=>({id, label:item.label || classLabelFor(id), precision:Number(item.precision || 0), recall:Number(item.recall || 0), f1:Number(item.f1 || 0), support:Number(item.support || 0)}));
+}
+function weakestMetric(item){
+  const metrics = [{name:'Precision', value:item.precision, text:'مدل وقتی این کلاس را پیش‌بینی می‌کند بیشتر خطا می‌کند.'}, {name:'Recall', value:item.recall, text:'مدل بخشی از نمونه‌های واقعی این کلاس را از دست می‌دهد.'}, {name:'F1', value:item.f1, text:'تعادل Precision و Recall برای این کلاس ضعیف‌تر است.'}];
+  return metrics.sort((a,b)=>a.value-b.value)[0];
+}
+function drawClassificationLayer(){
+  const layer = $('classificationAnalysisLayer');
+  layer.hidden = isRegression();
+  if(isRegression()){
+    $('classwiseSummary').innerHTML = ''; $('confidentMistakes').innerHTML = '';
+    return;
+  }
+  drawClasswisePerformance();
+  drawConfidenceDistribution();
+  renderConfidentMistakes();
+}
+function drawClasswisePerformance(){
+  const items = classwiseItems();
+  if(!items.length){ setPanel('classwisePanel','داده عملکرد کلاس‌ها در دسترس نیست.'); return; }
+  const best = [...items].sort((a,b)=>b.f1-a.f1)[0];
+  const weakest = [...items].sort((a,b)=>a.f1-b.f1)[0];
+  const lowestRecall = [...items].sort((a,b)=>a.recall-b.recall)[0];
+  $('classwiseSummary').innerHTML = [
+    ['بهترین F1', best], ['ضعیف‌ترین F1', weakest], ['کمترین Recall', lowestRecall]
+  ].map(([title,item])=>`<div><span>${escapeHtml(title)}</span><strong>${escapeHtml(item.label)}</strong><small>${title.includes('Recall') ? percent(item.recall) : percent(item.f1)}</small></div>`).join('');
+  charts.classwisePerformance = new Chart($('classwisePerformance'), {
+    type:'bar',
+    data:{labels:items.map(i=>i.label), datasets:[
+      {label:'Precision', data:items.map(i=>i.precision), backgroundColor:items.map(i=>i.id===weakest.id?'#fb923c':'#2563eb')},
+      {label:'Recall', data:items.map(i=>i.recall), backgroundColor:items.map(i=>i.id===weakest.id?'#fdba74':'#14b8a6')},
+      {label:'F1', data:items.map(i=>i.f1), backgroundColor:items.map(i=>i.id===weakest.id?'#ef4444':'#7c3aed')}
+    ]},
+    options:{maintainAspectRatio:false, plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${percent(c.raw)} | support: ${formatNumber(items[c.dataIndex].support)}`}}}, onClick:(evt)=>{ const hit=charts.classwisePerformance.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectClassPerformance(items[hit.index].id); }, scales:{y:{beginAtZero:true, max:1, ticks:{callback:v=>percent(v)}, title:{display:true,text:'درصد'}}, x:{title:{display:true,text:'کلاس'}}}}
+  });
+}
+function selectClassPerformance(classId){
+  vizState.selectedClass = classId;
+  const item = classwiseItems().find(x=>x.id===String(classId));
+  if(!item) return;
+  const weak = weakestMetric(item);
+  setPanel('classwisePanel', `<b>${escapeHtml(item.label)}</b><div class="fact-grid"><span>Precision</span><strong>${percent(item.precision)}</strong><span>Recall</span><strong>${percent(item.recall)}</strong><span>F1</span><strong>${percent(item.f1)}</strong><span>Support</span><strong>${formatNumber(item.support)}</strong></div><p class="warn">ضعیف‌ترین معیار: ${escapeHtml(weak.name)} (${percent(weak.value)}). ${escapeHtml(weak.text)}</p>`);
+}
+function confidenceBins(confidences, isCorrect, binCount = 10){
+  const bins = Array.from({length:binCount},(_,i)=>({label:`${(i/binCount).toFixed(1)}–${((i+1)/binCount).toFixed(1)}`, correct:0, incorrect:0, members:[]}));
+  confidences.forEach((value,i)=>{ const n=Number(value); if(!Number.isFinite(n)) return; const b=Math.min(binCount-1, Math.max(0, Math.floor(n*binCount))); bins[b][isCorrect?.[i] ? 'correct' : 'incorrect']++; bins[b].members.push(i); });
+  return bins;
+}
+function drawConfidenceDistribution(){
+  const confidences = vizState.raw.prediction_confidence || [];
+  const canvas = $('confidenceDistribution'), fallback = $('confidenceFallback'), panel = $('confidencePanel');
+  if(!confidences.length){ canvas.hidden = true; fallback.hidden = false; panel.hidden = true; fallback.textContent = 'این مدل احتمال کلاس‌ها را ارائه نمی‌کند، بنابراین نمودار اطمینان در دسترس نیست.'; return; }
+  canvas.hidden = false; fallback.hidden = true; panel.hidden = false;
+  vizState.confidenceBins = confidenceBins(confidences, vizState.raw.is_correct || []);
+  charts.confidenceDistribution = new Chart(canvas, {type:'bar', data:{labels:vizState.confidenceBins.map(b=>b.label), datasets:[{label:'درست', data:vizState.confidenceBins.map(b=>b.correct), backgroundColor:'#14b8a6'},{label:'غلط', data:vizState.confidenceBins.map(b=>b.incorrect), backgroundColor:'#f97316'}]}, options:{maintainAspectRatio:false, plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${formatNumber(c.raw)} نمونه`}}}, onClick:(evt)=>{ const hit=charts.confidenceDistribution.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(hit) selectConfidenceBin(hit.index); }, scales:{x:{stacked:false,title:{display:true,text:'بازه اطمینان'}}, y:{beginAtZero:true,title:{display:true,text:'تعداد نمونه'}}}}});
+}
+function selectConfidenceBin(binIndex){
+  vizState.selectedConfidenceBin = binIndex;
+  const bin = vizState.confidenceBins?.[binIndex]; if(!bin) return;
+  const total = bin.correct + bin.incorrect, rate = total ? bin.incorrect / total : 0;
+  const examples = bin.members.slice(0,6).map(i=>`<button onclick="selectPointByRawIndex(${i})"><span>#${i}</span><span>${escapeHtml(classLabelFor(vizState.raw.actual_class?.[i] ?? vizState.raw.actual[i]))} → ${escapeHtml(classLabelFor(vizState.raw.predicted_class?.[i] ?? vizState.raw.predicted[i]))}</span><b>${vizState.raw.is_correct?.[i] ? 'درست' : 'غلط'}</b></button>`).join('');
+  setPanel('confidencePanel', `<b>بازه اطمینان ${escapeHtml(bin.label)}</b><div class="fact-grid"><span>درست</span><strong>${formatNumber(bin.correct)}</strong><span>غلط</span><strong>${formatNumber(bin.incorrect)}</strong><span>نرخ خطا</span><strong>${percent(rate)}</strong></div><div class="mini-list">${examples || '<p>نمونه‌ای در این بازه نیست.</p>'}</div>`);
+}
+function probabilityBars(probabilities){
+  if(!probabilities) return '<p class="muted">این مدل احتمال کلاس‌ها را ارائه نمی‌کند.</p>';
+  return `<div class="prob-mini">${Object.entries(probabilities).map(([klass,prob])=>`<div><span>${escapeHtml(classLabelFor(klass))}</span><i style="width:${Math.max(0, Math.min(100, Number(prob)*100))}%"></i><b>${percent(prob)}</b></div>`).join('')}</div>`;
+}
+function renderConfidentMistakes(){
+  const mistakes = vizState.raw.confident_mistakes || [];
+  if(!mistakes.length){ $('confidentMistakes').innerHTML = '<div class="insight-panel">اشتباه پر اطمینانی برای این مدل پیدا نشد.</div>'; return; }
+  $('confidentMistakes').innerHTML = mistakes.slice(0,10).map((m,i)=>`<button class="mistake-card ${vizState.selectedMistake===i?'selected':''}" onclick="selectConfidentMistake(${i})"><span class="mistake-index">#${formatNumber(m.index)}</span><strong>${escapeHtml(m.actual_label || classLabelFor(m.actual))} → ${escapeHtml(m.predicted_label || classLabelFor(m.predicted))}</strong><em>${percent(m.confidence)}</em>${probabilityBars(m.probabilities)}</button>`).join('');
+}
+function selectConfidentMistake(index){
+  vizState.selectedMistake = index;
+  const m = (vizState.raw.confident_mistakes || [])[index]; if(!m) return;
+  setPanel('pointPanel', `<b>اشتباه پر اطمینان #${formatNumber(m.index)}</b><div class="fact-grid"><span>واقعی</span><strong>${escapeHtml(m.actual_label || classLabelFor(m.actual))}</strong><span>پیش‌بینی</span><strong>${escapeHtml(m.predicted_label || classLabelFor(m.predicted))}</strong><span>اطمینان</span><strong>${percent(m.confidence)}</strong></div><p class="warn">مدل با اعتماد بالا کلاس اشتباه را انتخاب کرده است.</p>`);
+  const data = vizState.confusion || buildConfusionMatrix();
+  const row = data.labels.findIndex(x=>String(x)===String(m.actual)); const col = data.labels.findIndex(x=>String(x)===String(m.predicted));
+  if(row >= 0 && col >= 0){ vizState.selectedConfusionCell = {row,col}; drawConfusionMatrix(); }
+  renderConfidentMistakes();
 }
 
 function histogram(values, n, formatter=formatNumber){
