@@ -99,57 +99,59 @@
     <div class="comparison-insights" id="comparisonInsights"></div>
   </section>
 
-  <section class="card learning-shell">
-    <div class="chart-heading">
+  <section class="card model-explorer" id="modelExplorer">
+    <div class="explorer-heading">
       <div>
-        <h2>کاوش تعاملی مدل</h2>
-        <p id="taskLesson" class="muted"></p>
+        <p class="eyebrow">Model Behavior Explorer</p>
+        <h2>کاوشگر رفتار مدل</h2>
+        <p id="taskLesson" class="muted">این بخش نشان می‌دهد مدل انتخاب‌شده چطور تصمیم می‌گیرد، کجا خطا می‌کند و به کدام ویژگی‌ها حساس‌تر است.</p>
       </div>
-      <div class="lesson-pills"><span>نقطه‌ها را کلیک کنید</span><span>بازه خطا را باز کنید</span><span>ویژگی‌ها را بررسی کنید</span></div>
+      <div id="explorerSummary" class="explorer-summary" aria-live="polite"></div>
     </div>
-    <div class="charts">
-      <article class="chart-card"><h3 id="scatterTitle">کاوشگر پیش‌بینی</h3><p class="chart-help" id="scatterHelp"></p><canvas id="scatter" class="scatter-canvas"></canvas><div id="confusionMatrix" class="confusion-matrix" hidden></div><div id="pointPanel" class="insight-panel">برای دیدن جزئیات، یک نقطه را انتخاب کنید.</div></article>
-      <article class="chart-card"><h3 id="errorTitle">توزیع خطای پیش‌بینی (Prediction Error Distribution)</h3><p class="chart-help" id="errorHelp">عدد منفی یعنی کم‌برآورد؛ عدد مثبت یعنی بیش‌برآورد.</p><canvas id="errors"></canvas><div id="binPanel" class="insight-panel">یک ستون خطا را انتخاب کنید.</div></article>
-      <article class="chart-card"><h3>لایه فهم ویژگی‌ها</h3><p class="chart-help">هر میله یک اهمیت کلی مدل است، نه دلیل قطعی یک پیش‌بینی خاص.</p><canvas id="importance"></canvas><div id="featurePanel" class="insight-panel">یک ویژگی را انتخاب کنید.</div></article>
+
+    <div class="explorer-nav" role="navigation" aria-label="Model behavior explorer sections">
+      <button type="button" data-explorer-section="errors" aria-label="رفتن به بخش خطاها">خطاها</button>
+      <button type="button" data-explorer-section="confidence" aria-label="رفتن به بخش اطمینان">اطمینان</button>
+      <button type="button" data-explorer-section="features" aria-label="رفتن به بخش ویژگی‌ها">ویژگی‌ها</button>
+      <button type="button" data-explorer-section="boundary" aria-label="رفتن به بخش مرز تصمیم">مرز تصمیم</button>
     </div>
-    <div id="classificationAnalysisLayer" class="classification-layer" hidden>
-      <article class="chart-card classwise-card">
-        <h3>عملکرد هر کلاس (Class-wise Performance)</h3>
-        <p class="chart-help">Precision می‌گوید وقتی مدل یک کلاس را انتخاب می‌کند چقدر درست است؛ Recall می‌گوید از نمونه‌های واقعی آن کلاس چندتا را پیدا کرده است.</p>
-        <canvas id="classwisePerformance"></canvas>
-        <div id="classwiseSummary" class="summary-strip"></div>
-        <div id="classwisePanel" class="insight-panel">یک کلاس را انتخاب کنید تا جزئیات Precision، Recall، F1 و Support نمایش داده شود.</div>
+
+    <div id="visualizationLoading" class="loading" hidden>در حال بارگذاری داده‌های تصویری...</div>
+
+    <div class="explorer-grid">
+      <article class="chart-card explorer-card" data-task-mode="both" data-explorer-card="errors" id="predictionBehaviorCard">
+        <div class="chart-card-header"><div><h3 id="scatterTitle">کاوشگر پیش‌بینی</h3><p class="chart-help" id="scatterHelp"></p></div><span class="chart-badge" data-card-badge></span></div>
+        <canvas id="scatter" class="scatter-canvas" aria-label="نمودار واقعی در برابر پیش‌بینی"></canvas>
+        <div id="confusionMatrix" class="confusion-matrix" role="grid" aria-label="ماتریس خطای طبقه‌بندی" hidden></div>
+        <div id="pointPanel" class="insight-panel">برای دیدن جزئیات، یک نقطه را انتخاب کنید.</div>
       </article>
-      <article class="chart-card confidence-card">
-        <h3>توزیع اطمینان مدل (Confidence Distribution)</h3>
-        <p class="chart-help">اگر خطاهای قرمز در بازه‌های اطمینان بالا زیاد باشند، مدل با اعتماد زیاد اشتباه می‌کند و باید با احتیاط بیشتری تفسیر شود.</p>
-        <canvas id="confidenceDistribution"></canvas>
-        <div id="confidenceFallback" class="insight-panel" hidden></div>
-        <div id="confidencePanel" class="insight-panel">یک بازه اطمینان را انتخاب کنید تا جزئیات نمونه‌ها نمایش داده شود.</div>
+      <article class="chart-card explorer-card" data-task-mode="both" data-explorer-card="errors" id="errorDistributionCard">
+        <div class="chart-card-header"><div><h3 id="errorTitle">توزیع خطای پیش‌بینی (Prediction Error Distribution)</h3><p class="chart-help" id="errorHelp">عدد منفی یعنی کم‌برآورد؛ عدد مثبت یعنی بیش‌برآورد.</p></div><span class="chart-badge" data-card-badge></span></div>
+        <canvas id="errors" aria-label="نمودار توزیع خطا یا درست و غلط"></canvas><div id="binPanel" class="insight-panel">یک ستون خطا را انتخاب کنید.</div>
       </article>
-      <article class="chart-card decision-boundary-card">
-        <h3>مرز تصمیم مدل (Decision Boundary)</h3>
-        <p class="chart-help">پس‌زمینه نشان می‌دهد مدل در هر ناحیه کدام کلاس را انتخاب می‌کند؛ نقطه‌ها نمونه‌های واقعی دیتاست هستند.</p>
-        <div class="decision-controls">
-          <label>X feature<select id="decisionXFeature"></select></label>
-          <label>Y feature<select id="decisionYFeature"></select></label>
-        </div>
-        <div id="decisionBoundaryLoading" class="loading" hidden>در حال محاسبه مرز تصمیم...</div>
-        <div id="decisionBoundaryError" class="insight-panel error-state" hidden></div>
-        <canvas id="decisionBoundary"></canvas>
-        <div id="decisionBoundaryPanel" class="insight-panel">یک نقطه از مرز تصمیم را انتخاب کنید.</div>
+      <article class="chart-card explorer-card" data-task-mode="classification" data-explorer-card="confidence" id="classwiseCard">
+        <div class="chart-card-header"><div><h3>عملکرد هر کلاس (Class-wise Performance)</h3><p class="chart-help">Precision می‌گوید وقتی مدل یک کلاس را انتخاب می‌کند چقدر درست است؛ Recall می‌گوید از نمونه‌های واقعی آن کلاس چندتا را پیدا کرده است.</p></div><span class="chart-badge" data-card-badge></span></div>
+        <canvas id="classwisePerformance" aria-label="نمودار عملکرد هر کلاس"></canvas><div id="classwiseSummary" class="summary-strip"></div><div id="classwisePanel" class="insight-panel">یک کلاس را انتخاب کنید تا جزئیات نمایش داده شود.</div>
       </article>
-      <article class="chart-card simplex-card">
-        <h3>مثلث احتمال کلاس‌ها (Probability Simplex)</h3>
-        <p class="chart-help">هر گوشه یعنی مدل به یک کلاس مطمئن است؛ نقاط نزدیک مرکز یعنی مدل بین کلاس‌ها مردد است.</p>
-        <canvas id="probabilitySimplex"></canvas>
-        <div id="simplexFallback" class="insight-panel" hidden></div>
-        <div id="simplexPanel" class="insight-panel">رنگ نقطه‌ها کلاس پیش‌بینی‌شده را نشان می‌دهد؛ دورخط قرمز/نارنجی یعنی پیش‌بینی غلط است.</div>
+      <article class="chart-card explorer-card" data-task-mode="classification" data-explorer-card="confidence" id="confidenceCard">
+        <div class="chart-card-header"><div><h3>توزیع اطمینان مدل (Confidence Distribution)</h3><p class="chart-help">اگر خطاهای نارنجی در بازه‌های اطمینان بالا زیاد باشند، مدل با اعتماد زیاد اشتباه می‌کند.</p></div><span class="chart-badge" data-card-badge></span></div>
+        <canvas id="confidenceDistribution" aria-label="نمودار توزیع اطمینان"></canvas><div id="confidenceFallback" class="insight-panel empty-panel" hidden></div><div id="confidencePanel" class="insight-panel">یک بازه اطمینان را انتخاب کنید.</div>
       </article>
-      <article class="chart-card mistakes-card">
-        <h3>اشتباه‌های پر اطمینان (Top Confident Mistakes)</h3>
-        <p class="warn">این نمونه‌ها مهم‌اند چون مدل با اطمینان بالا اشتباه کرده است.</p>
-        <div id="confidentMistakes" class="mistake-list"></div>
+      <article class="chart-card explorer-card" data-task-mode="classification" data-explorer-card="confidence" id="mistakesCard">
+        <div class="chart-card-header"><div><h3>اشتباه‌های پر اطمینان (Top Confident Mistakes)</h3><p class="chart-help">این نمونه‌ها مهم‌اند چون مدل با اطمینان بالا اشتباه کرده است.</p></div><span class="chart-badge" data-card-badge></span></div><div id="confidentMistakes" class="mistake-list"></div>
+      </article>
+      <article class="chart-card explorer-card" data-task-mode="classification" data-explorer-card="confidence" id="simplexCard">
+        <div class="chart-card-header"><div><h3>مثلث احتمال کلاس‌ها (Probability Simplex)</h3><p class="chart-help">هر گوشه یعنی مدل به یک کلاس مطمئن است؛ نقاط نزدیک مرکز یعنی مدل مردد است.</p></div><span class="chart-badge" data-card-badge></span></div>
+        <canvas id="probabilitySimplex" aria-label="مثلث احتمال کلاس‌ها"></canvas><div id="simplexFallback" class="insight-panel empty-panel" hidden></div><div id="simplexPanel" class="insight-panel">رنگ نقطه‌ها کلاس پیش‌بینی‌شده را نشان می‌دهد؛ دورخط یعنی خطا.</div>
+      </article>
+      <article class="chart-card explorer-card" data-task-mode="classification" data-explorer-card="boundary" id="decisionBoundaryCard">
+        <div class="chart-card-header"><div><h3>مرز تصمیم مدل (Decision Boundary)</h3><p class="chart-help">پس‌زمینه نشان می‌دهد مدل در هر ناحیه کدام کلاس را انتخاب می‌کند؛ نقطه‌ها نمونه‌های واقعی هستند.</p></div><span class="chart-badge" data-card-badge></span></div>
+        <div class="decision-controls"><label>X feature<select id="decisionXFeature"></select></label><label>Y feature<select id="decisionYFeature"></select></label></div>
+        <div id="decisionBoundaryLoading" class="loading" hidden>در حال محاسبه مرز تصمیم...</div><div id="decisionBoundaryError" class="insight-panel error-state" hidden></div><canvas id="decisionBoundary" aria-label="نمودار مرز تصمیم"></canvas><div id="decisionBoundaryPanel" class="insight-panel">یک نقطه از مرز تصمیم را انتخاب کنید.</div>
+      </article>
+      <article class="chart-card explorer-card" data-task-mode="both" data-explorer-card="features" id="featureImportanceCard">
+        <div class="chart-card-header"><div><h3>اهمیت ویژگی‌ها (Feature Importance)</h3><p class="chart-help">هر میله یک اهمیت کلی مدل است، نه دلیل قطعی یک پیش‌بینی خاص.</p></div><span class="chart-badge" data-card-badge></span></div>
+        <canvas id="importance" aria-label="نمودار اهمیت ویژگی‌ها"></canvas><div id="featurePanel" class="insight-panel">یک ویژگی را انتخاب کنید.</div>
       </article>
     </div>
   </section>
