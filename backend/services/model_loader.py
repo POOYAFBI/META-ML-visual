@@ -59,10 +59,33 @@ def _norm_dataset(dataset: str) -> str:
     return DATASET_ALIASES.get(key, DATASET_ALIASES.get(key.upper(), key))
 
 
-def _fixed_path(path_text: str | None) -> Path | None:
+ALLOWED_PATH_ROOTS = (ROOT / "models", ROOT / "data")
+
+
+def _safe_path_label(path_text: str) -> str:
+    return Path(path_text.replace("\\", "/")).name or "requested file"
+
+
+def _fixed_path(path_text: str | None, *, expected_suffixes: set[str] | None = None) -> Path | None:
     if not path_text:
         return None
-    return ROOT / path_text.replace("\\", "/")
+
+    normalized_text = path_text.replace("\\", "/")
+    resolved_path = (ROOT / normalized_text).resolve()
+    allowed_roots = tuple(path.resolve() for path in ALLOWED_PATH_ROOTS)
+
+    if not any(resolved_path.is_relative_to(allowed_root) for allowed_root in allowed_roots):
+        raise ValueError("The requested model file is outside the allowed application storage area.")
+
+    file_label = _safe_path_label(path_text)
+    if not resolved_path.is_file():
+        raise ValueError(f"The requested model file '{file_label}' is not available.")
+
+    if expected_suffixes and resolved_path.suffix.lower() not in expected_suffixes:
+        allowed = ", ".join(sorted(expected_suffixes))
+        raise ValueError(f"The requested model file '{file_label}' has an unsupported file type. Expected: {allowed}.")
+
+    return resolved_path
 
 
 @lru_cache(maxsize=1)
@@ -92,12 +115,14 @@ def model_info(task: str, dataset: str, model_name: str) -> dict[str, Any]:
 @lru_cache(maxsize=64)
 def load_bundle(task: str, dataset: str, model_name: str) -> dict[str, Any]:
     info = model_info(task, dataset, model_name)
-    with _fixed_path(info["feature_names_path"]).open(encoding="utf-8") as fh:
+    feature_names_path = _fixed_path(info["feature_names_path"], expected_suffixes={".json"})
+    with feature_names_path.open(encoding="utf-8") as fh:
         features = json.load(fh)["feature_names"]
-    scaler_path = _fixed_path(info.get("scaler_path"))
+    model_path = _fixed_path(info["model_path"], expected_suffixes={".pkl"})
+    scaler_path = _fixed_path(info.get("scaler_path"), expected_suffixes={".pkl"})
     return {
         "info": info,
-        "model": joblib.load(_fixed_path(info["model_path"])),
+        "model": joblib.load(model_path),
         "scaler": joblib.load(scaler_path) if scaler_path else None,
         "features": features,
         "data_path": DATA_PATHS[(info["task_type"], info["dataset_type"])],
