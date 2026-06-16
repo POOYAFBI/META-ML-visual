@@ -345,7 +345,7 @@ $('predict').onclick = async()=>{
 };
 loadOptions().catch(e=>alert(e.message));
 
-const comparisonMockData = {
+const mockComparisonData = {
   regression: {
     task: 'regression',
     primary_metric: 'rmse',
@@ -414,26 +414,35 @@ const comparisonMockData = {
     ]
   }
 };
-let comparisonState = {task:'regression', selectedId:null};
-function comparisonData(){ return comparisonMockData[comparisonState.task]; }
-function comparisonRows(){ return comparisonData().rows; }
+async function loadComparisonData(task){
+  // Future backend integration: replace the mock return below with
+  // return api(`/api/comparison?task=${encodeURIComponent(task)}`);
+  const data = mockComparisonData[task];
+  if(!data) throw new Error(`Unknown comparison task: ${task}`);
+  return typeof structuredClone === 'function' ? structuredClone(data) : JSON.parse(JSON.stringify(data));
+}
+let comparisonState = {task:'regression', selectedRow:null, data:null, loading:false, error:null};
+function comparisonData(){ return comparisonState.data; }
+function comparisonRows(){ return comparisonData()?.rows || []; }
 function comparisonLabel(row){ return `${row.dataset_label_fa} (${row.dataset_label_en}) / ${row.model_label_fa} (${row.model_label_en})`; }
 function comparisonMetricValue(row, key){ return row[key]; }
 function formatMetricValue(value, kind){ return ['accuracy','weighted_f1','macro_f1','r2','normalized_rmse'].includes(kind) ? percent(value) : formatMoney(value); }
-function bestComparisonRow(){ return comparisonRows().find(r=>r.id===comparisonData().best.row_id) || comparisonRows().find(r=>r.rank===1) || comparisonRows()[0]; }
+function bestComparisonRow(){ const cfg=comparisonData(); return comparisonRows().find(r=>r.id===cfg?.best?.row_id) || comparisonRows().find(r=>r.rank===1) || comparisonRows()[0]; }
 function metricClass(row, key){ const rows=comparisonRows(), dir=comparisonData().metric_definitions[key]?.direction; const vals=rows.map(r=>comparisonMetricValue(r,key)); const best=dir==='lower'?Math.min(...vals):Math.max(...vals); return comparisonMetricValue(row,key)===best?' best-metric':''; }
 function renderComparison(){
-  const cfg=comparisonData(), rows=cfg.rows, best=bestComparisonRow();
-  if(!comparisonState.selectedId) comparisonState.selectedId=best.id;
-  document.querySelectorAll('.comparison-tab').forEach(btn=>{ const active=btn.dataset.comparisonTask===cfg.task; btn.classList.toggle('active',active); btn.setAttribute('aria-selected', String(active)); });
+  const cfg=comparisonData();
+  if(!cfg){ renderComparisonStatus(comparisonState.error || 'داده‌ای برای مقایسه در دسترس نیست.'); return; }
+  const rows=cfg.rows, best=bestComparisonRow();
+  if(!comparisonState.selectedRow) comparisonState.selectedRow=best.id;
+  document.querySelectorAll('.comparison-tab').forEach(btn=>{ const active=btn.dataset.comparisonTask===cfg.task; btn.classList.toggle('active',active); btn.setAttribute('aria-selected', String(active)); btn.disabled=false; });
   $('comparisonSummary').innerHTML = cfg.summary_cards.map(card=>`<article class="summary-card"><span>${escapeHtml(card.title)}</span><strong>${escapeHtml(card.value)}</strong><small>${escapeHtml(card.detail)}</small></article>`).join('');
   const reg=cfg.task==='regression';
   const cols=reg?['Dataset','Model','RMSE','MAE','R²','Normalized RMSE','Rank']:['Dataset','Model','Accuracy','Weighted F1','Macro F1','Rank'];
-  $('comparisonTable').innerHTML = `<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="${r.id===cfg.best.row_id?'best-row ':''}${r.id===comparisonState.selectedId?'selected-row':''}" data-comparison-id="${r.id}"><td><b>${escapeHtml(r.dataset_label_fa)}</b><small>${escapeHtml(r.dataset_label_en)} · raw: ${escapeHtml(r.dataset_raw_name)} · id: ${escapeHtml(r.dataset_id)}</small></td><td><b>${escapeHtml(r.model_label_fa)}</b><small>${escapeHtml(r.model_label_en)} · raw: ${escapeHtml(r.model_raw_name)}</small></td>${reg?`<td class="number${metricClass(r,'rmse')}">${formatMoney(r.rmse)}</td><td class="number${metricClass(r,'mae')}">${formatMoney(r.mae)}</td><td class="number${metricClass(r,'r2')}">${percent(r.r2)}</td><td class="number${metricClass(r,'normalized_rmse')}">${percent(r.normalized_rmse)}</td>`:`<td class="number${metricClass(r,'accuracy')}">${percent(r.accuracy)}</td><td class="number${metricClass(r,'weighted_f1')}">${percent(r.weighted_f1)}</td><td class="number${metricClass(r,'macro_f1')}">${percent(r.macro_f1)}</td>`}<td><span class="rank-pill">#${formatNumber(r.rank)}</span></td></tr>`).join('')}</tbody>`;
+  $('comparisonTable').innerHTML = `<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="${r.id===cfg.best.row_id?'best-row ':''}${r.id===comparisonState.selectedRow?'selected-row':''}" data-comparison-id="${r.id}"><td><b>${escapeHtml(r.dataset_label_fa)}</b><small>${escapeHtml(r.dataset_label_en)} · raw: ${escapeHtml(r.dataset_raw_name)} · id: ${escapeHtml(r.dataset_id)}</small></td><td><b>${escapeHtml(r.model_label_fa)}</b><small>${escapeHtml(r.model_label_en)} · raw: ${escapeHtml(r.model_raw_name)}</small></td>${reg?`<td class="number${metricClass(r,'rmse')}">${formatMoney(r.rmse)}</td><td class="number${metricClass(r,'mae')}">${formatMoney(r.mae)}</td><td class="number${metricClass(r,'r2')}">${percent(r.r2)}</td><td class="number${metricClass(r,'normalized_rmse')}">${percent(r.normalized_rmse)}</td>`:`<td class="number${metricClass(r,'accuracy')}">${percent(r.accuracy)}</td><td class="number${metricClass(r,'weighted_f1')}">${percent(r.weighted_f1)}</td><td class="number${metricClass(r,'macro_f1')}">${percent(r.macro_f1)}</td>`}<td><span class="rank-pill">#${formatNumber(r.rank)}</span></td></tr>`).join('')}</tbody>`;
   document.querySelectorAll('#comparisonTable tbody tr').forEach(tr=>tr.onclick=()=>selectComparisonRow(tr.dataset.comparisonId));
   renderComparisonCharts(); renderComparisonInsights(); renderComparisonDetail();
 }
-function selectComparisonRow(id){ comparisonState.selectedId=id; renderComparison(); }
+function selectComparisonRow(id){ comparisonState.selectedRow=id; renderComparison(); }
 function renderComparisonCharts(){
   const cfg=comparisonData(), rows=cfg.rows;
   destroy('comparisonOne'); destroy('comparisonTwo');
@@ -442,7 +451,7 @@ function renderComparisonCharts(){
   $('comparisonChartOneHelp').textContent=cfg.metric_definitions[firstChart.metric].helper_text;
   $('comparisonChartTwoTitle').textContent=secondChart.title;
   $('comparisonChartTwoHelp').textContent=cfg.metric_definitions[secondChart.metric].helper_text;
-  const labels=rows.map(comparisonLabel), colors=rows.map(r=>r.id===comparisonState.selectedId?'#7c3aed':r.id===cfg.best.row_id?'#22c55e':'#2563eb');
+  const labels=rows.map(comparisonLabel), colors=rows.map(r=>r.id===comparisonState.selectedRow?'#7c3aed':r.id===cfg.best.row_id?'#22c55e':'#2563eb');
   const make = (canvas, chart) => new Chart($(canvas), {
     type: 'bar',
     data: {
@@ -479,9 +488,33 @@ function renderComparisonInsights(){
   ].map(([h,p])=>`<article><h3>${h}</h3><p>${p}</p></article>`).join('');
 }
 function renderComparisonDetail(){
-  const cfg=comparisonData(), row=comparisonRows().find(r=>r.id===comparisonState.selectedId) || bestComparisonRow(), best=bestComparisonRow(), reg=cfg.task==='regression';
+  const cfg=comparisonData(), row=comparisonRows().find(r=>r.id===comparisonState.selectedRow) || bestComparisonRow(), best=bestComparisonRow(), reg=cfg.task==='regression';
   const delta=reg?row.rmse-best.rmse:best.weighted_f1-row.weighted_f1;
   $('comparisonDetailPanel').innerHTML = `<h3>جزئیات انتخاب‌شده</h3><p><b>${escapeHtml(comparisonLabel(row))}</b></p><div class="fact-grid"><span>Dataset raw</span><strong>${escapeHtml(row.dataset_raw_name)}</strong><span>Model raw</span><strong>${escapeHtml(row.model_raw_name)}</strong><span>Rank</span><strong>#${formatNumber(row.rank)}</strong>${reg?`<span>RMSE</span><strong>${formatMoney(row.rmse)}</strong><span>MAE</span><strong>${formatMoney(row.mae)}</strong><span>R²</span><strong>${percent(row.r2)}</strong><span>Normalized RMSE</span><strong>${percent(row.normalized_rmse)}</strong>`:`<span>Accuracy</span><strong>${percent(row.accuracy)}</strong><span>Weighted F1</span><strong>${percent(row.weighted_f1)}</strong><span>Macro F1</span><strong>${percent(row.macro_f1)}</strong>`}</div><p>${escapeHtml(row.interpretation)}</p><p class="warn">مقایسه با بهترین: ${reg?`RMSE این انتخاب ${formatMoney(delta)} از بهترین ${delta===0?'برابر/بهتر نیست؛ خودش بهترین است':'بیشتر'} است.`:`Weighted F1 این انتخاب ${percent(delta)} ${delta===0?'با بهترین برابر است':'کمتر از بهترین'} است.`}</p>`;
 }
-document.querySelectorAll('.comparison-tab').forEach(btn=>btn.onclick=()=>{comparisonState={task:btn.dataset.comparisonTask, selectedId:null}; renderComparison();});
-renderComparison();
+function renderComparisonStatus(message, isLoading=false){
+  destroy('comparisonOne'); destroy('comparisonTwo');
+  document.querySelectorAll('.comparison-tab').forEach(btn=>{ const active=btn.dataset.comparisonTask===comparisonState.task; btn.classList.toggle('active',active); btn.setAttribute('aria-selected', String(active)); btn.disabled=isLoading; });
+  $('comparisonSummary').innerHTML = `<article class="summary-card"><span>${isLoading?'Loading':'Error'}</span><strong>${escapeHtml(message)}</strong><small>${isLoading?'Preparing comparison data':'Please try switching tasks again'}</small></article>`;
+  $('comparisonTable').innerHTML = '';
+  $('comparisonDetailPanel').innerHTML = isLoading ? 'در حال بارگذاری داده‌های مقایسه...' : `<p class="warn">${escapeHtml(message)}</p>`;
+  $('comparisonChartOneTitle').textContent = isLoading ? 'Loading...' : 'Comparison unavailable';
+  $('comparisonChartOneHelp').textContent = '';
+  $('comparisonChartTwoTitle').textContent = '';
+  $('comparisonChartTwoHelp').textContent = '';
+  $('comparisonInsights').innerHTML = '';
+}
+async function reloadComparison(task=comparisonState.task){
+  comparisonState = {task, selectedRow:null, data:null, loading:true, error:null};
+  renderComparisonStatus('در حال بارگذاری داده‌های مقایسه...', true);
+  try{
+    const data = await loadComparisonData(task);
+    comparisonState = {task, selectedRow:null, data, loading:false, error:null};
+    renderComparison();
+  }catch(e){
+    comparisonState = {task, selectedRow:null, data:null, loading:false, error:e.message};
+    renderComparisonStatus(`خطا در بارگذاری مقایسه: ${e.message}`);
+  }
+}
+document.querySelectorAll('.comparison-tab').forEach(btn=>btn.onclick=()=>reloadComparison(btn.dataset.comparisonTask));
+reloadComparison();
