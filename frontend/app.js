@@ -99,7 +99,7 @@ function renderAdvancedForm(features){
   $('form').innerHTML = order.filter(g=>groups[g]?.length).map(group=>`
     <section class="feature-group"><h3>${escapeHtml(group)}</h3><div class="feature-grid">${groups[group].map(f=>{
       if(f.kind === 'oneHotSelect') return `<label>${escapeHtml(f.labelFa)} <small>${escapeHtml(f.rawName)}</small><select data-onehot-group="${escapeHtml(f.name)}"><option value="">هیچ‌کدام / پایه</option>${f.options.map(o=>`<option value="${escapeHtml(o.rawName)}">${escapeHtml(o.oneHotValue)} (${escapeHtml(o.rawName)})</option>`).join('')}</select></label>`;
-      return `<label>${escapeHtml(f.labelFa)} <small>${escapeHtml(f.rawName)}</small><input name="${escapeHtml(f.name)}" title="${escapeHtml(f.help || '')}" type="number" step="any" value="0"></label>`;
+      return `<label>${escapeHtml(f.labelFa)} <small>${escapeHtml(f.rawName)}</small><input name="${escapeHtml(f.name)}" title="${escapeHtml(f.help || '')}" type="number" step="any" value="${escapeHtml(f.default ?? 0)}"></label>`;
     }).join('')}</div></section>`).join('');
 }
 
@@ -574,6 +574,17 @@ function resetPanels(){
   setPanel('featurePanel','یک ویژگی را انتخاب کنید تا معنی اهمیت و محدودیت آن را ببینید.');
 }
 
+function renderFeatureValidation(data){
+  const v = data.feature_validation || {};
+  const ok = !!v.ok;
+  return `<div class="validation-panel ${ok ? 'valid' : 'invalid'}"><b>Feature validation</b><span>${ok ? '✅ معتبر' : '❌ نامعتبر'}</span><small>${formatNumber(v.actual_features || 0)} / ${formatNumber(v.expected_features || 0)} features · NaN: ${formatNumber(v.nan_count || 0)}</small></div>`;
+}
+function renderFeaturePreview(data){
+  const rows = (data.feature_preview || []).slice(0, 12).map(x=>`<tr><td>${escapeHtml(x.feature)}</td><td>${formatNumber(x.value)}</td><td>${escapeHtml(x.source)}</td></tr>`).join('');
+  const builder = data.feature_builder || {};
+  return `<details class="feature-preview"><summary>Feature preview — بردار ارسال‌شده به مدل</summary><p class="muted">Defaults from training means: ${formatNumber(builder.defaults_used_count || 0)} · engineered: ${(builder.engineered_features || []).map(escapeHtml).join(', ') || '-'}</p><table><thead><tr><th>Feature</th><th>Value</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table></details>`;
+}
+
 function renderResult(data){
   lastPrediction = data;
   const meta = data.model_metadata || {};
@@ -596,10 +607,13 @@ function renderResult(data){
   $('resultCard').innerHTML = `
     <div class="result-topline"><span>${title}</span><span class="badge">قابلیت اتکا: ${reliabilityFa[reliability] || reliability}</span></div>
     <div class="prediction-value">${mainValue}</div>
+    <div class="raw-output"><small>Raw model output</small><code>${escapeHtml(data.raw_model_output ?? data.prediction)}</code></div>
     ${range ? `<div class="range-line explainer" title="${escapeHtml(rangeHelp)}"><b>بازه تقریبی پیش‌بینی (${escapeHtml(rangeBasis)})</b><span>${range}</span><small>${escapeHtml(rangeHelp)}</small></div>` : ''}
     <div class="confidence-block explainer" title="${escapeHtml(confidenceTip)}"><div><b>${escapeHtml(confidenceTitle)}</b><span>${percent(confidence)}</span></div><div class="progress"><i style="width:${Math.max(0, Math.min(100, confidence * 100))}%"></i></div><small>${escapeHtml(confidenceTip)}</small></div>
     <div class="info-panel"><div><small>مدل</small><b>${escapeHtml(modelLabel(meta.model_name || '-'))}</b></div><div><small>دیتاست</small><b>${escapeHtml(datasetLabel(meta.dataset_used || '-', meta.dataset_type))}</b></div><div><small>نوع مسئله</small><b>${escapeHtml(faTask[meta.task_type] || meta.task_type || '-')}</b></div></div>
     <div class="analysis"><b>تحلیل</b><p>${escapeHtml(data.analysis?.explanation || '')}</p><p id="featureContext" class="muted">با انتخاب یک ویژگی از نمودار اهمیت، ارتباط کلی آن با رفتار مدل اینجا نمایش داده می‌شود.</p></div>
+    ${renderFeatureValidation(data)}
+    ${renderFeaturePreview(data)}
     ${probs ? `<div class="probabilities"><b>احتمال کلاس‌ها</b>${probs}</div>` : ''}`;
 }
 
@@ -609,7 +623,7 @@ $('predict').onclick = async()=>{
   if(activeMode()==='advanced'){
     document.querySelectorAll('#form input').forEach(i=>body.features[i.name]=Number(i.value||0));
     document.querySelectorAll('#form select[data-onehot-group]').forEach(sel=>{
-      currentFeatures.filter(f=>f.oneHotGroup===sel.dataset.onehotGroup).forEach(f=>body.features[f.name]=f.rawName===sel.value?1:0);
+      if(sel.value) body.features[sel.dataset.onehotGroup] = sel.value;
     });
   }
   if(activeMode()==='preset') body.preset_id = $('preset').value;

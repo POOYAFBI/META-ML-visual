@@ -11,6 +11,7 @@ from .services.comparison import comparison
 from .services.decision_surface import decision_surface
 from .services.inputs import list_presets, list_samples, preset_features, sample_features
 from .services.feature_metadata import feature_meta
+from .services.feature_builder import training_schema
 from .schemas import (
     ComparisonResponse,
     FeaturesResponse,
@@ -34,7 +35,14 @@ def options():
 def features(task: str = Query(...), dataset: str = Query(...), model: str = Query(...)):
     try:
         bundle = load_bundle(task, dataset, model)
-        return {"features": [feature_meta(f) for f in bundle["features"]]}
+        schema = training_schema(task, dataset, model)
+        features = []
+        for name in bundle["features"]:
+            meta = feature_meta(name)
+            meta["default"] = schema["means"].get(name, 0.0)
+            meta["default_source"] = "training_mean"
+            features.append(meta)
+        return {"features": features}
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 

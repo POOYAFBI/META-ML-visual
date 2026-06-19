@@ -4,6 +4,7 @@ from typing import Any
 import numpy as np
 from .model_loader import load_bundle
 from .metrics import evaluation, mean_target_value
+from .feature_builder import build_features
 
 
 def coerce_value(value: Any) -> float:
@@ -48,7 +49,11 @@ def _analysis(confidence: float, task_type: str) -> dict[str, Any]:
 def predict(task: str, dataset: str, model_name: str, inputs: dict[str, Any]) -> dict[str, Any]:
     bundle = load_bundle(task, dataset, model_name)
     task_type = bundle["info"]["task_type"]
-    X = feature_vector(bundle["features"], inputs)
+    built = build_features(task, dataset, model_name, inputs)
+    validation = built["validation"]
+    if not validation["ok"]:
+        raise ValueError("Invalid feature vector: " + "; ".join(validation["errors"]))
+    X = built["vector"]
     if bundle["scaler"] is not None:
         X = bundle["scaler"].transform(X)
 
@@ -56,6 +61,15 @@ def predict(task: str, dataset: str, model_name: str, inputs: dict[str, Any]) ->
     result: dict[str, Any] = {
         "prediction": float(pred) if task_type == "regression" else int(pred),
         "model_metadata": _metadata(bundle),
+        "raw_model_output": float(pred) if task_type == "regression" else int(pred),
+        "feature_validation": validation,
+        "feature_preview": built["preview"],
+        "feature_builder": {
+            "applied_inputs": built["applied_inputs"],
+            "engineered_features": built["engineered_features"],
+            "categorical_selections": built["categorical_selections"],
+            "defaults_used_count": len(built["defaults_used"]),
+        },
     }
 
     if task_type == "regression":
