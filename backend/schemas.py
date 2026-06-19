@@ -57,6 +57,11 @@ class PredictResponse(BaseModel):
     predicted_class: int | None = None
     class_probabilities: dict[str, float] | None = None
 
+    raw_model_output: float | int | None = None
+    feature_validation: dict[str, Any] | None = None
+    feature_preview: list[dict[str, Any]] | None = None
+    feature_builder: dict[str, Any] | None = None
+
 
 class FeaturesResponse(BaseModel):
     features: list[dict[str, Any]]
