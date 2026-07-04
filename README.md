@@ -1,6 +1,9 @@
-# 🏠 Housing Price Prediction - ML Benchmarking Project
+# 🏠 Housing Price Prediction - ML Benchmarking Project -demo
 
 A comprehensive machine learning project comparing regression and classification models for housing price prediction using the Ames Housing Dataset.
+this is expermental and in early stages only for experemts.
+full version will be updated and uploaded in another repo and will receive updates for new ml models and ux - ui
+read the expermental md files to found out what really happend in the background of making this and enjoy!!
 
 ---
 
